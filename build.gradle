@@ -59,6 +59,10 @@ dependencies {
     // Testing dependencies
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.testcontainers:junit-jupiter'
+    // Add Hamcrest for containsString matcher
+    testImplementation 'org.hamcrest:hamcrest:2.2'
+    // Add Spring MockMvc for @AutoConfigureMockMvc (if not already included)
+    testImplementation 'org.springframework.boot:spring-boot-starter-web'
     
     // Development tools
     developmentOnly 'org.springframework.boot:spring-boot-devtools'

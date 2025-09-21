@@ -11,6 +11,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLong;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * =================================================================================================
@@ -81,6 +83,7 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 @Component
 public class BusinessContextIdGenerator {
+    private static final Logger logger = LoggerFactory.getLogger(BusinessContextIdGenerator.class);
     
     private final String productCode;
     private final String environment;
