@@ -1,4 +1,4 @@
-# Distributed Tracing with Resilience4j POC
+# Distributed Tracing and Resilience4j Examples POC
 
 A comprehensive Proof of Concept demonstrating **enterprise-grade distributed tracing** across a multi-tier architecture with **complete fault tolerance** using OpenTelemetry and all Resilience4j patterns.
 
