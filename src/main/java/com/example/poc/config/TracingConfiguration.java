@@ -11,10 +11,13 @@ import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter;
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.resources.Resource;
 import io.opentelemetry.sdk.trace.SdkTracerProvider;
+import io.opentelemetry.sdk.trace.SdkTracerProviderBuilder;
+import io.opentelemetry.sdk.trace.SpanProcessor;
 import io.opentelemetry.sdk.trace.export.BatchSpanProcessor;
 import io.opentelemetry.sdk.trace.samplers.Sampler;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -91,77 +94,83 @@ public class TracingConfiguration {
   @Value("${management.otlp.tracing.endpoint:http://localhost:4317}")
   private String otlpEndpoint;
 
-  /**
-   * Creates OpenTelemetry SDK with comprehensive resource attributes combining standard
-   * OpenTelemetry attributes with custom business metadata as discussed in the distributed tracing
-   * implementation strategy
-   */
+  // Expose Resource as a bean so other components (and tests) can reuse/extend it.
   @Bean
-  public OpenTelemetry openTelemetry() {
+  public Resource openTelemetryResource() {
+    return Resource.getDefault()
+        .merge(
+            Resource.create(
+                Attributes.builder()
+                    // Standard OpenTelemetry semantic convention keys (avoid semconv dependency)
+                    .put("service.name", applicationName)
+                    .put("service.namespace", "ecommerce")
+                    .put("service.version", "1.0.0")
+                    .put(
+                        "service.instance.id",
+                        System.getProperty(
+                            "instance.id", java.net.InetAddress.getLoopbackAddress().getHostName()))
+                    .put("deployment.environment", System.getProperty("environment", "development"))
 
-    // Create custom resource with business context as discussed in the chat
-    Resource resource =
-        Resource.getDefault()
-            .merge(
-                Resource.create(
-                    Attributes.builder()
-                        // Standard OpenTelemetry semantic convention keys (avoid semconv
-                        // dependency)
-                        .put("service.name", applicationName)
-                        .put("service.namespace", "ecommerce")
-                        .put("service.version", "1.0.0")
-                        .put(
-                            "service.instance.id",
-                            System.getProperty(
-                                "instance.id",
-                                java.net.InetAddress.getLoopbackAddress().getHostName()))
-                        .put(
-                            "deployment.environment",
-                            System.getProperty("environment", "development"))
+                    // Custom business attributes as discussed in the architecture overview
+                    .put("app.name", "DistributedTracingPOC")
+                    .put("product.code", productCode)
+                    .put("business.unit", businessUnit)
+                    .put("cost.center", costCenter)
+                    .put("data.classification", dataClassification)
 
-                        // Custom business attributes as discussed in the architecture overview
-                        .put("app.name", "DistributedTracingPOC")
-                        .put("product.code", productCode)
-                        .put("business.unit", businessUnit)
-                        .put("cost.center", costCenter)
-                        .put("data.classification", dataClassification)
+                    // Build and deployment metadata for production traceability
+                    .put(
+                        "build.version",
+                        getClass().getPackage().getImplementationVersion() != null
+                            ? getClass().getPackage().getImplementationVersion()
+                            : "dev-build")
+                    .put("build.timestamp", Instant.now().toString())
+                    .put("deployment.type", "on-premises-monolith") // As per chat architecture
 
-                        // Build and deployment metadata for production traceability
-                        .put(
-                            "build.version",
-                            getClass().getPackage().getImplementationVersion() != null
-                                ? getClass().getPackage().getImplementationVersion()
-                                : "dev-build")
-                        .put("build.timestamp", Instant.now().toString())
-                        .put("deployment.type", "on-premises-monolith") // As per chat architecture
+                    // Infrastructure metadata
+                    .put("infrastructure.layer", "layer-1-monolith")
+                    .put("java.version", System.getProperty("java.version"))
+                    .put(
+                        "spring.boot.version",
+                        org.springframework.boot.SpringBootVersion.getVersion())
+                    .build()));
+  }
 
-                        // Infrastructure metadata
-                        .put("infrastructure.layer", "layer-1-monolith")
-                        .put("java.version", System.getProperty("java.version"))
-                        .put(
-                            "spring.boot.version",
-                            org.springframework.boot.SpringBootVersion.getVersion())
-                        .build()));
-
-    return OpenTelemetrySdk.builder()
-        .setTracerProvider(
-            SdkTracerProvider.builder()
-                .setResource(resource)
-                .addSpanProcessor(
-                    BatchSpanProcessor.builder(
-                            OtlpGrpcSpanExporter.builder()
-                                .setEndpoint(
-                                    otlpEndpoint) // Compatible with AWS X-Ray via ADOT Collector
-                                .setCompression("gzip") // Optimize network traffic
-                                .build())
-                        .setMaxExportBatchSize(512) // Batch size for efficiency
-                        .setScheduleDelay(Duration.ofMillis(500)) // Regular export interval
-                        .setMaxQueueSize(2048) // Queue size for high throughput
-                        .build())
-                .setSampler(
-                    Sampler.alwaysOn()) // For POC - use probabilistic sampling in production
+  // Default OTLP exporter wrapped in a BatchSpanProcessor. Declared as a bean so tests can add
+  // additional processors (e.g., InMemory) without replacing this one.
+  @Bean
+  public SpanProcessor otlpBatchSpanProcessor() {
+    return BatchSpanProcessor.builder(
+            OtlpGrpcSpanExporter.builder()
+                .setEndpoint(otlpEndpoint) // Compatible with AWS X-Ray via ADOT Collector
+                .setCompression("gzip") // Optimize network traffic
                 .build())
-        // W3C standard propagators for cross-service tracing as discussed
+        .setMaxExportBatchSize(512) // Batch size for efficiency
+        .setScheduleDelay(Duration.ofMillis(500)) // Regular export interval
+        .setMaxQueueSize(2048) // Queue size for high throughput
+        .build();
+  }
+
+  // Tracer provider assembled from resource and any declared SpanProcessor beans (including the
+  // default OTLP one above).
+  @Bean
+  public SdkTracerProvider sdkTracerProvider(
+      Resource openTelemetryResource, List<SpanProcessor> spanProcessors) {
+    SdkTracerProviderBuilder builder =
+        SdkTracerProvider.builder()
+            .setResource(openTelemetryResource)
+            .setSampler(Sampler.alwaysOn());
+    for (SpanProcessor processor : spanProcessors) {
+      builder.addSpanProcessor(processor);
+    }
+    return builder.build();
+  }
+
+  /** Creates OpenTelemetry SDK from the tracer provider and registers W3C propagators. */
+  @Bean
+  public OpenTelemetry openTelemetry(SdkTracerProvider sdkTracerProvider) {
+    return OpenTelemetrySdk.builder()
+        .setTracerProvider(sdkTracerProvider)
         .setPropagators(
             ContextPropagators.create(
                 TextMapPropagator.composite(

@@ -74,13 +74,13 @@ spring:
     name: distributed-tracing-resilience-poc
   profiles:
     active: dev
-  
+
   # Cache Configuration for Resilience4j Cache pattern
   cache:
     type: caffeine
     caffeine:
       spec: maximumSize=1000,expireAfterWrite=300s
-  
+
   # Jackson Configuration for JSON processing
   jackson:
     default-property-inclusion: non_null
@@ -97,7 +97,7 @@ app:
     center: CC-2025-001
   data:
     classification: internal
-  
+
   # Security-related configurations
   security:
     # Salt for hashing user identifiers.
@@ -117,7 +117,7 @@ management:
       correlation:
         fields: user.id,action.type,user.session.id,business.transaction.id,business.correlation.id
       remote-fields: user.id,action.type,user.session.id,business.transaction.id,business.correlation.id
-  
+
   # OTLP Exporter Configuration - Compatible with AWS X-Ray via ADOT Collector
   otlp:
     tracing:
@@ -125,14 +125,14 @@ management:
       # endpoint: http://localhost:4318/v1/traces  # OTLP HTTP endpoint alternative
       compression: gzip
       timeout: 10s
-  
+
   # Actuator Configuration for monitoring all Resilience4j patterns
   endpoints:
     web:
       exposure:
         include: health,info,metrics,circuitbreakers,ratelimiters,retries,bulkheads,timelimiters,caches,traces
       base-path: /actuator
-  
+
   endpoint:
     health:
       show-details: always
@@ -142,7 +142,7 @@ management:
 
 # Comprehensive Resilience4j Configuration - ALL PATTERNS
 resilience4j:
-  
+
   # Circuit Breaker Configuration - Prevents cascading failures
   circuitbreaker:
     configs:
@@ -352,12 +352,12 @@ logging:
     io.opentelemetry: INFO
     org.springframework.web: DEBUG
     org.springframework.cache: DEBUG
-  
+
   # Pattern for console output with trace context
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{traceId:-},%X{spanId:-}] [%X{businessTransactionId:-}] [%X{correlationId:-}] [%X{userId:-}] %logger{36} - %msg%n"
     file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{traceId:-},%X{spanId:-}] [%X{businessTransactionId:-}] [%X{correlationId:-}] [%X{userId:-}] %logger{36} - %msg%n"
-  
+
   # Optional: Log to file for production
   file:
     name: logs/distributed-tracing-poc.log
