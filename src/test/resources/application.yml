@@ -1,0 +1,3 @@
+sim:
+  failure:
+    lambda: 1.0

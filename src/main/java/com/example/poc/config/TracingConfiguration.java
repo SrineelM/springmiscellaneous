@@ -22,6 +22,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
+import org.springframework.context.annotation.Profile;
 
 /**
  * =================================================================================================
@@ -139,6 +140,7 @@ public class TracingConfiguration {
   // Default OTLP exporter wrapped in a BatchSpanProcessor. Declared as a bean so tests can add
   // additional processors (e.g., InMemory) without replacing this one.
   @Bean
+  @Profile("!test")
   public SpanProcessor otlpBatchSpanProcessor() {
     return BatchSpanProcessor.builder(
             OtlpGrpcSpanExporter.builder()
@@ -160,6 +162,9 @@ public class TracingConfiguration {
         SdkTracerProvider.builder()
             .setResource(openTelemetryResource)
             .setSampler(Sampler.alwaysOn());
+    // TODO(sampling): Replace alwaysOn with a parent-based traceidratio sampler in prod, e.g.:
+    // .setSampler(Sampler.parentBased(Sampler.traceIdRatioBased(0.1))) and externalize ratio per
+    // env.
     for (SpanProcessor processor : spanProcessors) {
       builder.addSpanProcessor(processor);
     }
@@ -191,4 +196,7 @@ public class TracingConfiguration {
   public Tracer tracer(OpenTelemetry openTelemetry) {
     return openTelemetry.getTracer("com.example.poc.tracing");
   }
+
+  // TODO(processors): Consider adding a SpanProcessor for dynamic filtering/redaction
+  // (e.g., drop INTERNAL spans for chatty layers in prod, or mask attribute values by key).
 }

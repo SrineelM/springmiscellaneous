@@ -108,31 +108,19 @@ app:
 
 # OpenTelemetry and Tracing Configuration
 management:
-  # Tracing configuration implementing chat requirements
   tracing:
     sampling:
       probability: 1.0  # 100% sampling for POC - use lower values in production
-    baggage:
-      # Micrometer baggage config (only used if Micrometer drives tracing). Keep dotted keys here too.
-      correlation:
-        fields: user.id,action.type,user.session.id,business.transaction.id,business.correlation.id
-      remote-fields: user.id,action.type,user.session.id,business.transaction.id,business.correlation.id
-
-  # OTLP Exporter Configuration - Compatible with AWS X-Ray via ADOT Collector
   otlp:
     tracing:
       endpoint: http://localhost:4317  # OTLP gRPC endpoint
-      # endpoint: http://localhost:4318/v1/traces  # OTLP HTTP endpoint alternative
       compression: gzip
       timeout: 10s
-
-  # Actuator Configuration for monitoring all Resilience4j patterns
   endpoints:
     web:
       exposure:
         include: health,info,metrics,circuitbreakers,ratelimiters,retries,bulkheads,timelimiters,caches,traces
       base-path: /actuator
-
   endpoint:
     health:
       show-details: always
@@ -389,6 +377,10 @@ spring:
   config:
     activate:
       on-profile: prod
+  # Spring Security (dev defaults overridden via env in prod)
+  security:
+    user: ${ACTUATOR_USER:actuator}
+    password: ${ACTUATOR_PASSWORD:actuator}
 
 # Stricter settings for production
 management:
@@ -410,11 +402,6 @@ resilience4j:
 logging:
   level:
     com.example.poc: INFO         # Less verbose in production
-
-# Spring Security (dev defaults overridden via env in prod)
-  security:
-    user: ${ACTUATOR_USER:actuator}
-    password: ${ACTUATOR_PASSWORD:actuator}
 
 ---
 # Test Profile Specific Configuration
@@ -442,3 +429,7 @@ management:
   tracing:
     sampling:
       probability: 1.0                 # Full sampling for tests
+  otlp:
+    tracing:
+      # Avoid exporting over network during tests
+      endpoint: http://localhost:0

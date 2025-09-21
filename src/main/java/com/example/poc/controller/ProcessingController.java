@@ -421,6 +421,11 @@ public class ProcessingController {
 
       logger.info("Pattern test completed: {} - Result: {}", pattern, result.getStatus());
 
+      // If result is fallback or error, return 5xx, else 200
+      if ("FALLBACK".equalsIgnoreCase(result.getStatus())
+          || "ERROR".equalsIgnoreCase(result.getStatus())) {
+        return ResponseEntity.internalServerError().body(result);
+      }
       return ResponseEntity.ok(result);
 
     } catch (Exception e) {

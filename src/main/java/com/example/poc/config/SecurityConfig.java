@@ -36,6 +36,10 @@ public class SecurityConfig {
                     .anyRequest()
                     .permitAll())
         .httpBasic(Customizer.withDefaults());
+    // TODO(prod): Move actuator to a dedicated management port and restrict by network policy/IP
+    // allowlist
+    // TODO(auth): Replace basic auth with OIDC/LDAP and role-based access controls for actuator
+    // endpoints
     return http.build();
   }
 
@@ -45,8 +49,8 @@ public class SecurityConfig {
    */
   @Bean
   public UserDetailsService userDetailsService(
-      @Value("${management.security.user:actuator}") String user,
-      @Value("${management.security.password:actuator}") String password) {
+      @Value("${spring.security.user:actuator}") String user,
+      @Value("${spring.security.password:actuator}") String password) {
     PasswordEncoder encoder = PasswordEncoderFactories.createDelegatingPasswordEncoder();
     UserDetails actuatorUser =
         User.withUsername(user)

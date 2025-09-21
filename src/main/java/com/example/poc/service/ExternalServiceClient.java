@@ -73,6 +73,8 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class ExternalServiceClient {
+  @org.springframework.beans.factory.annotation.Value("${sim.failure.lambda:0.3}")
+  private double lambdaFailureRate;
 
   private static final Logger logger = LoggerFactory.getLogger(ExternalServiceClient.class);
 
@@ -100,8 +102,8 @@ public class ExternalServiceClient {
     // Simulate network latency and processing time
     simulateProcessingDelay(100, 500);
 
-    // Simulate occasional failures to demonstrate circuit breaker
-    if (ThreadLocalRandom.current().nextDouble() < 0.3) {
+    // Simulate occasional failures to demonstrate circuit breaker (configurable for tests)
+    if (ThreadLocalRandom.current().nextDouble() < lambdaFailureRate) {
       throw new RuntimeException("Lambda service temporarily unavailable - simulated failure");
     }
 
@@ -126,6 +128,12 @@ public class ExternalServiceClient {
   public ProcessingResult fallbackLambdaCall(String userId, String data, Exception ex) {
     logger.warn(
         "Lambda service fallback triggered for user: {} - Reason: {}", userId, ex.getMessage());
+
+    // Set a fallback attribute on the current span for test compliance
+    io.opentelemetry.api.trace.Span span = io.opentelemetry.api.trace.Span.current();
+    if (span != null && span.getSpanContext().isValid()) {
+      span.setAttribute("fallback", true);
+    }
 
     return ProcessingResult.builder()
         .resultId("fallback-lambda-result")
@@ -216,6 +224,7 @@ public class ExternalServiceClient {
    */
   @TimeLimiter(name = "databaseService")
   @CircuitBreaker(name = "databaseService", fallbackMethod = "fallbackDatabaseCall")
+  @Bulkhead(name = "databaseService", type = Bulkhead.Type.THREADPOOL)
   @Retry(name = "databaseService")
   @TraceMethod(operationName = "database-operation")
   @BusinessOperation(
@@ -225,40 +234,37 @@ public class ExternalServiceClient {
       expectedDuration = "slow",
       criticality = "critical")
   public CompletableFuture<ProcessingResult> performDatabaseOperationAsync(String query) {
-    // NOTE: For @TimeLimiter and thread-pool bulkhead patterns, prefer letting Resilience4j
-    // manage the executor rather than using supplyAsync here. This POC uses supplyAsync for
-    // simplicity; in production, execute the supplier through the decorator to ensure proper
-    // isolation and timeout behavior.
-    return CompletableFuture.supplyAsync(
-        () -> {
-          logger.info("Executing database query: {}", maskSensitiveQuery(query));
+    // Let Resilience4j ThreadPoolBulkhead/TimeLimiter control async execution. The annotated proxy
+    // will submit this supplier to the bulkhead's executor; avoid manual supplyAsync here.
+    logger.info("Executing database query: {}", maskSensitiveQuery(query));
 
-          try {
-            // Simulate database operation that might take time
-            simulateProcessingDelay(500, 2000);
+    // TODO(observability): Add span events for SQL phases (parse/plan/execute) instead of
+    // attributes
+    // to reduce attribute cardinality while preserving timeline visibility.
 
-            // Simulate occasional database failures (15% failure rate)
-            if (ThreadLocalRandom.current().nextDouble() < 0.15) {
-              throw new RuntimeException("Database connection timeout - simulated failure");
-            }
+    // Simulate database operation that might take time
+    simulateProcessingDelay(500, 2000);
 
-            return ProcessingResult.builder()
-                .resultId("db-result-" + ThreadLocalRandom.current().nextInt(1000))
-                .message("Database query executed successfully")
-                .status("SUCCESS")
-                .sourceService("postgresql-database")
-                .operationType("DATABASE_QUERY")
-                .processingTimeMs(ThreadLocalRandom.current().nextLong(500, 1500))
-                .addBusinessContext("database", "primary-db")
-                .addBusinessContext("table", "processed_data")
-                .addMetadata("rows_affected", ThreadLocalRandom.current().nextInt(1, 100))
-                .addMetadata("query_plan_cost", ThreadLocalRandom.current().nextDouble(1.0, 10.0))
-                .build();
+    // Simulate occasional database failures (15% failure rate)
+    if (ThreadLocalRandom.current().nextDouble() < 0.15) {
+      throw new RuntimeException("Database connection timeout - simulated failure");
+    }
 
-          } catch (Exception e) {
-            throw new RuntimeException("Database operation failed", e);
-          }
-        });
+    ProcessingResult result =
+        ProcessingResult.builder()
+            .resultId("db-result-" + ThreadLocalRandom.current().nextInt(1000))
+            .message("Database query executed successfully")
+            .status("SUCCESS")
+            .sourceService("postgresql-database")
+            .operationType("DATABASE_QUERY")
+            .processingTimeMs(ThreadLocalRandom.current().nextLong(500, 1500))
+            .addBusinessContext("database", "primary-db")
+            .addBusinessContext("table", "processed_data")
+            .addMetadata("rows_affected", ThreadLocalRandom.current().nextInt(1, 100))
+            .addMetadata("query_plan_cost", ThreadLocalRandom.current().nextDouble(1.0, 10.0))
+            .build();
+
+    return CompletableFuture.completedFuture(result);
   }
 
   /** Fallback method for database operation failures. */
@@ -341,6 +347,9 @@ public class ExternalServiceClient {
     // Simulate complex business logic with variable processing time
     simulateProcessingDelay(400, 1200);
 
+    // TODO(perf): Consider switching to event-based markers for rule evaluation rather than
+    // separate attributes to keep spans lighter under high throughput.
+
     // Simulate business rule failures (25% failure rate)
     if (ThreadLocalRandom.current().nextDouble() < 0.25) {
       throw new RuntimeException("Complex operation failed due to business rules");
@@ -395,28 +404,28 @@ public class ExternalServiceClient {
       expectedDuration = "slow",
       criticality = "low")
   public CompletableFuture<ProcessingResult> performHeavyProcessing(String dataId, int dataSize) {
-    // NOTE: Similar consideration as above regarding executor control by Resilience4j.
-    return CompletableFuture.supplyAsync(
-        () -> {
-          logger.info("Starting heavy processing for data: {} with size: {} MB", dataId, dataSize);
+    // Let ThreadPoolBulkhead/TimeLimiter schedule this work off the caller thread.
+    logger.info("Starting heavy processing for data: {} with size: {} MB", dataId, dataSize);
 
-          // Simulate heavy CPU/memory intensive operation
-          simulateProcessingDelay(1000, 3000);
+    // Simulate heavy CPU/memory intensive operation
+    simulateProcessingDelay(1000, 3000);
 
-          return ProcessingResult.builder()
-              .resultId("heavy-result-" + dataId)
-              .message("Heavy processing completed")
-              .status("SUCCESS")
-              .sourceService("heavy-processing-engine")
-              .operationType("HEAVY_PROCESSING")
-              .processingTimeMs(ThreadLocalRandom.current().nextLong(1000, 2500))
-              .addBusinessContext("data_id", dataId)
-              .addBusinessContext("data_size_mb", String.valueOf(dataSize))
-              .addBusinessContext("thread_pool", "heavy-processing")
-              .addMetadata("memory_used_mb", dataSize * 2)
-              .addMetadata("cpu_time_ms", ThreadLocalRandom.current().nextLong(500, 2000))
-              .build();
-        });
+    ProcessingResult result =
+        ProcessingResult.builder()
+            .resultId("heavy-result-" + dataId)
+            .message("Heavy processing completed")
+            .status("SUCCESS")
+            .sourceService("heavy-processing-engine")
+            .operationType("HEAVY_PROCESSING")
+            .processingTimeMs(ThreadLocalRandom.current().nextLong(1000, 2500))
+            .addBusinessContext("data_id", dataId)
+            .addBusinessContext("data_size_mb", String.valueOf(dataSize))
+            .addBusinessContext("thread_pool", "heavy-processing")
+            .addMetadata("memory_used_mb", dataSize * 2)
+            .addMetadata("cpu_time_ms", ThreadLocalRandom.current().nextLong(500, 2000))
+            .build();
+
+    return CompletableFuture.completedFuture(result);
   }
 
   // Utility methods

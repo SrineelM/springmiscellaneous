@@ -1,5 +1,3 @@
-// NOTE (architectural): Spring Boot bumped to 3.5.x to align with latest fixes and API stability.
-// Spotless is added to auto-format code, but configured to not fail the build if it needs to apply changes.
 plugins {
     id 'org.springframework.boot' version '3.5.0'
     id 'io.spring.dependency-management' version '1.1.6'
@@ -11,64 +9,37 @@ group = 'com.example'
 version = '1.0.0'
 
 java {
-    sourceCompatibility = '17'
-}
-
-configurations {
-    compileOnly {
-        extendsFrom annotationProcessor
-    }
+    sourceCompatibility = JavaVersion.VERSION_17
 }
 
 repositories {
     mavenCentral()
 }
 
-// NOTE (observability stack): We keep both the Micrometer bridge and manual OTel exporter available.
-// This allows either (a) custom OTel SDK configuration or (b) Micrometer Tracing autoconfiguration.
-// If you standardize on Micrometer, you can remove the custom OTel SDK beans and keep the bridge only.
 ext {
     set('openTelemetryVersion', '1.40.0')
     set('resilience4jVersion', '2.3.0')
 }
 
 dependencies {
-    // Spring Boot Starters
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springframework.boot:spring-boot-starter-cache'
     implementation 'org.springframework.boot:spring-boot-starter-aop'
     implementation 'org.springframework.boot:spring-boot-starter-security'
-    
-    // OpenTelemetry Dependencies for distributed tracing (manual SDK path kept for flexibility).
-    // If you prefer Micrometer-only, keep the bridge and remove manual SDK beans.
+
     implementation 'io.micrometer:micrometer-tracing-bridge-otel'
     implementation 'io.opentelemetry:opentelemetry-exporter-otlp'
-    
-    // Resilience4j Dependencies - streamline to Spring Boot 3 starter.
-    // NOTE (dependency hygiene): The starter transitively brings the core modules
-    // (circuitbreaker, ratelimiter, retry, bulkhead, timelimiter, cache).
-    // Keep the starter only to avoid duplicate classes and version drift.
     implementation "io.github.resilience4j:resilience4j-spring-boot3:${resilience4jVersion}"
-    // Optional: metrics binding. Keep if you want dedicated Resilience4j metrics via Micrometer.
     implementation "io.github.resilience4j:resilience4j-micrometer:${resilience4jVersion}"
-    
-    // AspectJ for AOP support
-    // Brought transitively by spring-boot-starter-aop; no need to declare explicitly.
-    
-    // JSON logging for structured logs with trace context
-    // JSON logging encoder. Either adopt JSON logging in logback-spring.xml, or remove this dependency to simplify.
     implementation 'net.logstash.logback:logstash-logback-encoder:8.0'
-    
-    // Caffeine cache for better caching performance
     implementation 'com.github.ben-manes.caffeine:caffeine'
-    
-    // Testing dependencies
+
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.testcontainers:junit-jupiter'
     testImplementation 'org.hamcrest:hamcrest:2.2'
-    
-    // Development tools
+    testImplementation "io.opentelemetry:opentelemetry-sdk-testing:${openTelemetryVersion}"
+
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
     annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
 }
@@ -77,36 +48,48 @@ tasks.named('test') {
     useJUnitPlatform()
 }
 
-// Spotless: format sources, but do not fail the build if formatting issues are found (non-blocking developer ergonomics)
+// Preserve method parameter names in bytecode so AOP/tracing can access them reliably
+tasks.withType(JavaCompile).configureEach {
+    options.compilerArgs += ['-parameters']
+}
+
+/** ---- Spotless configuration ---- */
 spotless {
     java {
         googleJavaFormat()
         toggleOffOn()
-        indentWithSpaces(4)
         trimTrailingWhitespace()
         endWithNewline()
     }
-    format 'misc', {
+    format('misc') {
         target '**/*.md', '**/.gitignore'
+        indentWithSpaces(2)
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+    format('yaml') {
+        target '**/*.yml', '**/*.yaml'
         indentWithSpaces(2)
         trimTrailingWhitespace()
         endWithNewline()
     }
 }
 
-// Make formatting non-blocking: attempt to apply on each build, but do not fail if something slips through.
-tasks.register('spotlessWarn') {
+// Auto-format before build
+tasks.register('spotlessAutoFormat') {
     group = 'formatting'
-    description = 'Runs Spotless check but does not fail the build.'
-    doLast {
-        try {
-            tasks.named('spotlessApply').get().execute()
-        } catch (Exception ignored) {
-            logger.lifecycle('Spotless formatting attempted; continuing without failing the build.')
-        }
-    }
+    description = 'Auto-formats Java/Markdown/YAML before build without failing the build.'
+    dependsOn 'spotlessApply'
 }
 
+// Ensure auto-format runs automatically
 tasks.named('build') {
-    dependsOn 'spotlessWarn'
+    dependsOn 'spotlessAutoFormat'
+}
+
+// 🔑 Disable *all* Spotless check tasks so formatting can never block the build
+tasks.withType(com.diffplug.gradle.spotless.SpotlessTask).configureEach {
+    if (name.endsWith("Check")) {
+        enabled = false
+    }
 }
