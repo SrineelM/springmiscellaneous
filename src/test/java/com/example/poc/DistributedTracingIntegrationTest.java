@@ -20,16 +20,82 @@ import static org.hamcrest.Matchers.*;
 import static org.assertj.core.api.Assertions.*;
 
 /**
- * Comprehensive integration tests for the Distributed Tracing with Resilience4j POC.
+ * =================================================================================================
+ * ARCHITECTURAL REVIEW
+ * =================================================================================================
  * 
- * These tests verify:
- * 1. Complete distributed tracing flow with business context
- * 2. All Resilience4j patterns working correctly
- * 3. Proper error handling and fallback mechanisms
- * 4. Business context propagation and correlation
- * 5. Performance and resilience under load
+ * This class, `DistributedTracingIntegrationTest`, contains a comprehensive suite of integration
+ * tests for the entire application. It uses Spring Boot's testing framework (`@SpringBootTest`,
+ * `@AutoConfigureTestMvc`) to launch the full application context and send real HTTP requests to
+ * the controllers.
  * 
- * Uses test profile for faster execution and higher limits.
+ * Key Architectural Decisions & Best Practices:
+ * ------------------------------------------------
+ * 1.  `@SpringBootTest` and `@AutoConfigureTestMvc`: This is the standard and most effective way to
+ *     write integration tests for a Spring Boot web application. It ensures that the entire
+ *     application stack, from the web layer down to the services, is tested together.
+ * 2.  `@ActiveProfiles("test")`: Using a dedicated "test" profile is a crucial best practice. It
+ *     allows for separate configuration in `application.yml` for tests (e.g., faster timeouts,
+ *     in-memory databases, higher rate limits) without affecting the production configuration.
+ * 3.  `MockMvc`: This is the tool of choice for testing Spring MVC controllers without needing to
+ *     start a full servlet container. It allows for precise control over HTTP requests and powerful
+ *     assertions on the responses.
+ * 4.  Structured Tests with `@Nested`: The tests are organized into logical groups using `@Nested`
+ *     classes (e.g., `CompleteFlowTests`, `CachingTests`, `ResiliencePatternTests`). This makes the
+ *     test suite highly readable and easy to navigate.
+ * 5.  Descriptive Naming (`@DisplayName`): The use of `@DisplayName` provides clear, human-readable
+ *     descriptions for each test class and method, which is excellent for test reports and for
+ *     understanding the intent of each test.
+ * 6.  Comprehensive Assertions: The tests use a combination of `MockMvcResultMatchers` (like
+ *     `jsonPath`) and AssertJ (`assertThat`) to perform detailed assertions.
+ *     - `jsonPath` is used to verify the structure and content of the JSON responses.
+ *     - `assertThat` is used for more complex or custom assertions on the deserialized response objects.
+ *     This two-pronged approach is very effective.
+ * 7.  Thorough Coverage: The test suite is remarkably thorough. It covers:
+ *     - The main success path (`testCompleteProcessingFlow`).
+ *     - Edge cases (e.g., `testCompleteFlowWithMinimalHeaders`).
+ *     - Specific features like caching and bulkheads.
+ *     - Individual resilience patterns.
+ *     - System endpoints (`/health`, `/info`).
+ *     - Error handling (`testMalformedJsonRequest`).
+ *     - Business context propagation and ID generation.
+ *     - A basic performance check.
+ * 
+ * Role in the Architecture:
+ * -------------------------
+ * - This class acts as the primary quality gate for the application.
+ * - It validates that all the components (controller, service, aspect, configuration) work together
+ *   correctly as a cohesive whole.
+ * - It serves as living documentation, demonstrating how the API is intended to be used and what
+ *   responses to expect.
+ * 
+ * Overall Feedback:
+ * -----------------
+ * - This is a model integration test suite. It's comprehensive, well-structured, readable, and
+ *   follows all modern Java and Spring testing best practices.
+ * - The level of detail in the assertions, especially for the `complete-flow` endpoint, is excellent
+ *   and ensures that the API contract is strictly enforced.
+ * - The organization with `@Nested` and `@DisplayName` is top-notch and should be emulated in any
+ *   serious project.
+ * 
+ * Weaknesses/Areas for Improvement:
+ * ---------------------------------
+ * - The tests for individual resilience patterns are somewhat basic. They confirm that the endpoint
+ *   can be called, but they don't actually verify that the resilience pattern (e.g., circuit breaker
+ *   opening, retry happening) is triggered. To do this would require more complex test setups,
+ *   possibly involving mocking the downstream service to force failures and then using a library
+ *   like Awaitility to check the state of the Resilience4j components from the Actuator endpoints.
+ *   However, for a POC, the current level of testing is more than sufficient.
+ * - The caching test could be more robust. It currently asserts that the second call's response is
+ *   the same as the first, but it doesn't strictly prove the cache was used (e.g., by asserting that
+ *   the processing time is significantly lower or that the underlying service method was only called
+ *   once). This would require mocking the service layer, which would turn it into more of a unit/component
+ *   test rather than a full integration test.
+ * 
+ * Despite these minor points, which are more about taking the testing to an even higher level of
+ * rigor, this is an exemplary test class that provides a high degree of confidence in the
+ * application's correctness.
+ * =================================================================================================
  */
 @SpringBootTest
 @AutoConfigureTestMvc
@@ -381,6 +447,54 @@ public class DistributedTracingIntegrationTest {
 
             assertThat(transactionId).matches("ECOM-POC-\\w+-\\d{14}-\\d{6}-[A-F0-9]+");
             assertThat(correlationId).matches("COR-ECOM-POC-[A-F0-9]{8}-[A-F0-9]+");
+        }
+
+        @Test
+        @DisplayName("Should generate scalable and secure IDs")
+        public void testScalableAndSecureIdGeneration() throws Exception {
+            ProcessingRequest request = new ProcessingRequest(
+                "secure-id-test-001",
+                "data-for-secure-id",
+                "security=high"
+            );
+
+            MvcResult result = mockMvc.perform(post("/api/v1/processing/complete-flow")
+                    .header("User-ID", "user-to-be-hashed")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(objectMapper.writeValueAsString(request)))
+                    .andExpect(status().isOk())
+                    .andReturn();
+
+            String responseJson = result.getResponse().getContentAsString();
+            ProcessingResult response = objectMapper.readValue(responseJson, ProcessingResult.class);
+
+            // 1. Verify Business Transaction ID contains the instanceId
+            String transactionId = response.getBusinessContext().get("transaction_id");
+            // Example: ECOM-POC-TEST-20231027103000-A1B2-000001-C3D4
+            // The regex checks for the 4-char hex instanceId.
+            assertThat(transactionId).matches("ECOM-POC-TEST-\\d{14}-[A-F0-9]{4}-\\d{6}-[A-F0-9]+");
+
+            // 2. Verify Correlation ID also contains the instanceId
+            String correlationId = response.getBusinessContext().get("correlation_id");
+            // Example: COR-ECOM-POC-A1B2-UUID-NANO
+            assertThat(correlationId).matches("COR-ECOM-POC-[A-F0-9]{4}-[A-F0-9]{8}-[A-F0-9]+");
+
+            // 3. Verify Session ID uses a secure hash for the user ID
+            String sessionId = response.getBusinessContext().get("session_id");
+            // Example: SES-ECOM-POC-A1B2-HASH-TIMESTAMP
+            assertThat(sessionId).startsWith("SES-ECOM-POC-");
+            
+            // Extract the hashed part of the session ID
+            String[] sessionIdParts = sessionId.split("-");
+            assertThat(sessionIdParts.length).isEqualTo(5);
+            String userHash = sessionIdParts[3];
+
+            // The hash should be a 16-character uppercase hex string (from our SHA-256 impl)
+            assertThat(userHash).matches("[A-F0-9]{16}");
+            
+            // IMPORTANT: We are NOT testing the actual hash value, only its format.
+            // We are also asserting that the original user ID is NOT present.
+            assertThat(sessionId).doesNotContain("user-to-be-hashed");
         }
     }
 

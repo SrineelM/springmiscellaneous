@@ -5,30 +5,39 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cache.annotation.EnableCaching;
 
 /**
- * Main application class for Distributed Tracing with Resilience4j POC
+ * =================================================================================================
+ * ARCHITECTURAL REVIEW
+ * =================================================================================================
  * 
- * This POC demonstrates:
- * 1. Complete distributed tracing with OpenTelemetry across multi-tier architecture
- * 2. Custom business context injection and ID generation following enterprise patterns
- * 3. AspectJ-based automatic instrumentation with business annotations
- * 4. All Resilience4j patterns: Circuit Breaker, Retry, Rate Limiter, Bulkhead, Time Limiter, Cache
- * 5. Baggage propagation for cross-service context sharing
- * 6. Custom resource attributes for business metadata
- * 7. Comprehensive error handling and fallback mechanisms
- * 8. Production-ready configuration and monitoring endpoints
+ * This is the main entry point for the Spring Boot application.
  * 
- * Architecture simulates:
- * - On-premises Java Spring monolith (this POC)
- * - AWS Lambda Python microservice (simulated)
- * - EKS Java Spring microservice (simulated)
+ * Key Architectural Decisions & Best Practices:
+ * ------------------------------------------------
+ * 1.  `@SpringBootApplication`: Standard annotation that enables auto-configuration, component scanning,
+ *     and property support. This is the foundation of the application.
+ * 2.  `@EnableCaching`: This annotation is crucial for activating Spring's caching abstraction.
+ *     In this POC, it enables the `@Cacheable` annotation used in `ExternalServiceClient` for the
+ *     Resilience4j Cache pattern demonstration. It's a good practice to enable features explicitly.
+ * 3.  System Properties for OpenTelemetry:
+ *     - `otel.java.global-autoconfigure.enabled`: Setting this to `true` leverages the OpenTelemetry
+ *       Java agent's auto-configuration capabilities, which simplifies setup.
+ *     - `otel.metrics.exporter`: Explicitly disabling the metrics exporter (`none`) is a smart choice
+ *       for this POC, as it focuses purely on distributed tracing. This reduces overhead and noise,
+ *       allowing developers to concentrate on the tracing aspect. In a real production scenario, this
+ *       would likely be configured to export to a monitoring system like Prometheus.
  * 
- * Features from the chat implemented:
- * - Business transaction ID generation with custom format
- * - Correlation ID propagation across service boundaries
- * - User context capture and baggage propagation
- * - Custom resource attributes for product code, business unit
- * - Structured logging with trace context integration
- * - X-Ray compatible trace export (via OTLP)
+ * Overall Feedback:
+ * -----------------
+ * - The class is well-structured and serves its purpose as the application's bootstrap point.
+ * - The comments provide excellent context about the POC's goals and architecture, which is invaluable
+ *   for new developers.
+ * - The explicit enabling of caching and configuration of OpenTelemetry system properties directly in
+ *   the main method are clear and effective for a self-contained POC. For a larger application, these
+ *   properties might be moved to a configuration file or startup script.
+ * 
+ * This class is a solid starting point for the application, correctly setting up the necessary
+ * features for the demonstration.
+ * =================================================================================================
  */
 @SpringBootApplication
 @EnableCaching

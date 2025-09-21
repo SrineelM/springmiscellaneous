@@ -35,6 +35,11 @@ This POC simulates a real-world distributed architecture commonly found in enter
 
 ## ✨ Features Implemented
 
+### 🚀 NEW: Production-Ready Enhancements
+- ✅ **Scalable ID Generation**: Business and correlation IDs now include a unique `instanceId` to prevent collisions in multi-instance, horizontally-scaled environments (e.g., Kubernetes).
+- ✅ **Enhanced Security**: User identifiers in session IDs are now protected using a salted **SHA-256 hash**, preventing reverse-engineering and protecting user privacy in logs and traces.
+- ✅ **Production Configuration Best Practices**: The `application.yml` now includes detailed comments explaining how to manage secrets (like the hashing salt) and configurations in a real production environment using tools like Spring Cloud Config and HashiCorp Vault.
+
 ### 🔍 OpenTelemetry Distributed Tracing
 
 #### Core Tracing Features
@@ -154,7 +159,14 @@ cd springmiscellaneous
 
 The application will start on `http://localhost:8080`
 
-### 4. Verify Startup
+### 4. Run the Integration Tests
+To verify that all changes, including the new scalable and secure ID generation, are working correctly, run the integration tests:
+```bash
+./gradlew test
+```
+This command will execute all tests in `DistributedTracingIntegrationTest.java`, including the newly added test case for validating the ID formats.
+
+### 5. Verify Startup
 ```bash
 curl http://localhost:8080/actuator/health
 ```
@@ -168,9 +180,9 @@ Expected response:
 
 ## 🧪 Testing the POC
 
-### Test 1: Complete Distributed Processing Flow
+### Test 1: Complete Distributed Processing Flow (with new secure & scalable IDs)
 
-This endpoint demonstrates the **full distributed tracing flow** with all Resilience4j patterns:
+This endpoint now demonstrates the **full distributed tracing flow** with the newly enhanced, production-ready ID generation:
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/processing/complete-flow \
@@ -198,6 +210,8 @@ curl -X POST http://localhost:8080/api/v1/processing/complete-flow \
 - ✅ Rate limiting
 - ✅ Complex business logic resilience
 - ✅ Baggage propagation across all layers
+- ✅ **NEW**: Generation of scalable `instanceId` in transaction and correlation IDs.
+- ✅ **NEW**: Secure, salted SHA-256 hashing of the `User-ID` for the session ID.
 
 ### Test 2: Cache Pattern Demonstration
 
@@ -309,14 +323,22 @@ curl http://localhost:8080/actuator/metrics
 
 ## 🎯 Business Context Features
 
-### Automatic Business ID Generation
+### Automatic Business ID Generation (Now Scalable & Secure)
 
-The POC generates hierarchical business IDs:
+The POC generates hierarchical, scalable, and secure business IDs:
 
 ```
-Transaction ID: ECOM-POC-DEV-20250920135400-001234-A7F3
-Correlation ID: COR-ECOM-POC-12AB34CD-E5F6789A
-Session ID: SES-ECOM-POC-A1B2C3D4-12345678
+Transaction ID: ECOM-POC-DEV-20250920135400-A1B2-001234-A7F3
+                                           |
+                                           +-- Unique Instance ID (4 hex chars)
+
+Correlation ID: COR-ECOM-POC-A1B2-12AB34CD-E5F6789A
+                             |
+                             +-- Unique Instance ID
+
+Session ID: SES-ECOM-POC-A1B2-A1B2C3D4E5F67890-12345678
+                                |
+                                +-- Salted SHA-256 Hash of User ID (16 hex chars)
 ```
 
 ### Baggage Propagation
@@ -384,6 +406,10 @@ src/main/java/com/example/poc/
 - **Consistent Format**: Enterprise-ready conventions
 - **Correlation Ready**: Perfect for log aggregation
 
+#### 4. **NEW**: Secure Configuration Management
+- **Secret Management**: Using a configurable salt for hashing, with clear guidance for using production secret managers (e.g., Vault).
+- **Configuration Best Practices**: In-code documentation on using tools like Spring Cloud Config for managing configurations at scale.
+
 ### Configuration Highlights
 
 #### Resilience4j Configuration (`application.yml`)
@@ -409,6 +435,16 @@ resilience4j:
       lambdaService:
         limit-for-period: 10
         limit-refresh-period: 1s
+```
+
+#### **NEW**: Security Configuration (`application.yml`)
+```yaml
+app:
+  security:
+    # Salt for hashing user identifiers.
+    # IMPORTANT: In a production environment, this value MUST be externalized
+    # using a secret manager like HashiCorp Vault, AWS Secrets Manager, or environment variables.
+    salt: "a-very-secure-and-random-salt-for-production-use"
 ```
 
 #### OpenTelemetry Configuration

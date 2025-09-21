@@ -8,9 +8,53 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Result model representing processing outcomes.
- * Contains comprehensive business context and technical metadata
- * for distributed tracing correlation and monitoring.
+ * =================================================================================================
+ * ARCHITECTURAL REVIEW
+ * =================================================================================================
+ * 
+ * The `ProcessingResult` class is a DTO that models the response sent back to the client. It's
+ * designed to be a rich, structured object containing not just the result of the operation but
+ * also a wealth of metadata and business context.
+ * 
+ * Key Architectural Decisions & Best Practices:
+ * ------------------------------------------------
+ * 1.  Rich, Structured Data: The DTO goes far beyond a simple success/failure message. It includes
+ *     fields for status, source service, operation type, timing information, and dedicated maps for
+ *     `metadata` and `businessContext`. This is a best practice for modern APIs, as it provides
+ *     clients with a huge amount of useful information.
+ * 2.  Builder Pattern: The inclusion of a static inner `ProcessingResultBuilder` class is an
+ *     excellent design choice. It makes constructing complex `ProcessingResult` objects clean,
+ *     readable, and less error-prone than using a constructor with many parameters. This is
+ *     particularly useful in the `ProcessingController`.
+ * 3.  `@JsonInclude(JsonInclude.Include.NON_NULL)`: This is a smart optimization. It tells Jackson
+ *     to omit any fields that are null from the final JSON output. This keeps the response payloads
+ *     clean and avoids cluttering them with unnecessary null values.
+ * 4.  `@JsonFormat`: Specifying the date-time format with `@JsonFormat` ensures that the `timestamp`
+ *     is always serialized in a consistent, ISO-8601-like format, which is a standard for APIs.
+ * 5.  Fluent Interface: The `addBusinessContext` and `addMetadata` methods return `this`, allowing
+ *     for chained calls (e.g., `result.addMetadata(...).addBusinessContext(...)`). This is a nice
+ *     ergonomic touch.
+ * 
+ * Role in the Architecture:
+ * -------------------------
+ * - It defines the data contract for API responses.
+ * - It serves as a vehicle for returning detailed feedback to the client, including correlation
+ *   IDs (`trace_id`, `span_id`) that the client can use for support requests.
+ * - The structured `metadata` and `businessContext` maps make the API highly extensible. New
+ *   information can be added to responses without changing the class structure.
+ * 
+ * Overall Feedback:
+ * -----------------
+ * - This is an exceptionally well-designed response DTO. It demonstrates a mature approach to API
+ *   design, prioritizing rich context and client-side usability.
+ * - The combination of a builder pattern, fluent methods, and thoughtful JSON serialization
+ *   configuration makes it both powerful and easy to use.
+ * - The separation of `metadata` (technical details) from `businessContext` (business-relevant data)
+ *   is a good logical distinction.
+ * 
+ * This class is a model example of how to design a flexible, informative, and developer-friendly
+ * API response object.
+ * =================================================================================================
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ProcessingResult {

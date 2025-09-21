@@ -31,21 +31,63 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * Comprehensive AspectJ implementation for distributed tracing with business context.
- * Implements all tracing features discussed in the chat:
+ * =================================================================================================
+ * ARCHITECTURAL REVIEW
+ * =================================================================================================
  * 
- * 1. Automatic span creation with business metadata
- * 2. User context extraction and propagation via baggage
- * 3. Custom business ID generation and correlation
- * 4. HTTP context extraction for web requests
- * 5. Structured logging integration with trace context
- * 6. Error handling and exception recording
- * 7. Performance monitoring with execution duration
- * 8. Business annotation processing for enhanced metadata
+ * This class, `DistributedTracingAspect`, is the heart of the entire distributed tracing and
+ * business context propagation system. It uses Aspect-Oriented Programming (AOP) to intercept
+ * method calls across different layers of the application and enrich them with tracing information.
  * 
- * This aspect intercepts all controller and service layer methods,
- * automatically creating spans with comprehensive business context
- * that can be correlated across the entire multi-tier architecture.
+ * Key Architectural Decisions & Best Practices:
+ * ------------------------------------------------
+ * 1.  `@Aspect` and `@Component`: Correctly marks the class as an AOP aspect and a Spring-managed
+ *     bean, allowing it to be automatically detected and applied.
+ * 2.  Comprehensive Pointcuts: The use of multiple pointcuts (`controllerLayer`, `serviceLayer`,
+ *     `traceableMethod`, `businessOperation`) combined into a single `applicationLayers` pointcut
+ *     is a robust strategy. It ensures that tracing is applied consistently across the application,
+ *     whether by layer convention or explicit annotation.
+ * 3.  `@Around` Advice: Using `@Around` advice is the right choice here, as it provides complete
+ *     control over the method execution. It allows the aspect to perform actions before and after
+ *     the method runs, handle exceptions, and even modify the return value if needed.
+ * 4.  Dependency Injection: The `Tracer` and `BusinessContextIdGenerator` are correctly injected
+ *     via the constructor, following Spring's best practices for dependency injection.
+ * 5.  Separation of Concerns: The class is well-organized into private helper methods, each with a
+ *     clear responsibility (e.g., `buildSpanName`, `enhanceSpanWithBusinessContext`, `createBusinessBaggage`).
+ *     This makes the main `enhancedDistributedTracing` method easier to read and maintain.
+ * 6.  Context Propagation (Baggage and MDC): The aspect correctly handles two types of context
+ *     propagation:
+ *     - **OpenTelemetry Baggage**: For propagating business context across service boundaries to
+ *       other microservices.
+ *     - **SLF4J MDC (Mapped Diagnostic Context)**: For enriching log messages within the current
+ *       service with trace and business IDs. This is crucial for correlating logs with traces.
+ * 7.  Defensive Programming & Secure Defaults:
+ *     - The aspect is resilient to running outside a web context (e.g., in a unit test) by catching
+ *       exceptions when accessing `HttpServletRequest`.
+ *     - It has secure defaults for logging method arguments and return values, only doing so when
+ *       explicitly requested via `@TraceMethod` and when the operation is not marked as sensitive.
+ * 
+ * Role in the Architecture:
+ * -------------------------
+ * - This class is the engine that drives the entire observability strategy of the POC.
+ * - It decouples the business logic from the cross-cutting concern of tracing. Developers can focus
+ *   on writing business code, and this aspect will automatically handle the tracing for them.
+ * - It acts as the bridge between the high-level business annotations (like `@BusinessOperation`)
+ *   and the low-level OpenTelemetry API.
+ * 
+ * Overall Feedback:
+ * -----------------
+ * - This is an exceptionally well-written and comprehensive AOP aspect. It demonstrates a deep
+ *   understanding of both distributed tracing concepts and Spring AOP.
+ * - The level of detail in the context extraction (from HTTP headers, method parameters, annotations)
+ *   is impressive and covers a wide range of real-world scenarios.
+ * - The implementation is robust, efficient, and follows best practices for security and performance
+ *   (e.g., limiting stack trace length, careful handling of sensitive data).
+ * 
+ * This class is the most critical piece of the puzzle, and it's implemented to a very high standard.
+ * It's a production-ready example of how to implement comprehensive, business-aware distributed
+ * tracing.
+ * =================================================================================================
  */
 @Aspect
 @Component

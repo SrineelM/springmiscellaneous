@@ -1,3 +1,58 @@
+# =================================================================================================
+# CONFIGURATION MANAGEMENT BEST PRACTICES (FOR PRODUCTION)
+# =================================================================================================
+#
+# While this `application.yml` file is excellent for a Proof of Concept (POC) and local development,
+# managing configuration this way in a real production environment has significant drawbacks,
+# especially concerning security and scalability.
+#
+# 1.  **Secret Management**:
+#     - **Problem**: Storing secrets like database passwords, API keys, or the `app.security.salt`
+#       directly in a Git repository is a major security risk.
+#     - **Production Solution**: Use a dedicated secret management tool.
+#       - **HashiCorp Vault**: A popular choice for centrally managing and accessing secrets.
+#         Spring Cloud Vault provides seamless integration.
+#       - **AWS Secrets Manager / Azure Key Vault / Google Secret Manager**: Cloud-native solutions
+#         that integrate well with their respective ecosystems.
+#       - **Environment Variables**: A simpler, platform-agnostic approach, but less secure and
+#         harder to manage at scale compared to a dedicated vault.
+#
+# 2.  **Dynamic Configuration**:
+#     - **Problem**: Changing a configuration value (e.g., a feature flag or a Resilience4j threshold)
+#       requires a full application rebuild and redeployment.
+#     - **Production Solution**: Use a centralized configuration server.
+#       - **Spring Cloud Config Server**: The standard Spring ecosystem solution. It can serve
+#         configurations from a Git repository (for non-sensitive data) or Vault. Applications
+#         can refresh their configuration at runtime without restarting.
+#       - **HashiCorp Consul**: Provides key-value storage for configuration that can be updated
+#         dynamically.
+#       - **etcd**: Another popular choice, especially in Kubernetes environments.
+#
+# 3.  **Profile Management at Scale**:
+#     - **Problem**: Managing multiple `---` sections for different environments (`dev`, `qa`, `prod`)
+#       within a single file becomes cumbersome and error-prone as the number of services and
+#       environments grows.
+#     - **Production Solution**: Externalize environment-specific configurations.
+#       - With Spring Cloud Config Server, you would have separate files like:
+#         - `application.yml` (for common properties)
+#         - `my-app-dev.yml` (for dev-specific overrides)
+#         - `my-app-prod.yml` (for prod-specific overrides)
+#       - The Config Server serves the correct set of properties based on the active profile of the
+#         client application.
+#
+# Recommended Production Setup Example:
+# --------------------------------------
+# - **Spring Cloud Config Server**: Backed by a Git repository for non-sensitive, environment-agnostic
+#   configuration.
+# - **HashiCorp Vault**: Integrated with the Config Server to provide sensitive data (like the salt).
+# - **Spring Boot Application**:
+#   - Includes `spring-cloud-starter-config` and `spring-cloud-starter-vault-config`.
+#   - `bootstrap.yml` points to the Config Server's address.
+#   - `application.yml` contains only the application name and profile.
+#   - The `app.security.salt` would be fetched from Vault via the Config Server at startup.
+#
+# =================================================================================================
+
 # Comprehensive Configuration for Distributed Tracing with Resilience4j POC
 # This configuration implements all features discussed in the chat
 
@@ -37,6 +92,14 @@ app:
     center: CC-2025-001
   data:
     classification: internal
+  
+  # Security-related configurations
+  security:
+    # Salt for hashing user identifiers.
+    # IMPORTANT: In a production environment, this value MUST be externalized
+    # using a secret manager like HashiCorp Vault, AWS Secrets Manager, or environment variables.
+    # Do NOT commit a real production salt to version control.
+    salt: "a-very-secure-and-random-salt-for-production-use"
 
 # OpenTelemetry and Tracing Configuration
 management:

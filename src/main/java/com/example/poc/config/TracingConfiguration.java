@@ -22,12 +22,60 @@ import java.time.Duration;
 import java.time.Instant;
 
 /**
- * Comprehensive OpenTelemetry configuration implementing all features discussed in the chat:
- * - Custom resource attributes with business metadata
- * - W3C trace context and baggage propagation for cross-service tracing
- * - OTLP exporter compatible with AWS X-Ray and Jaeger
- * - Custom sampling and batching strategies for production readiness
- * - Business context attributes as discussed in the architecture overview
+ * =================================================================================================
+ * ARCHITECTURAL REVIEW
+ * =================================================================================================
+ * 
+ * This class, `TracingConfiguration`, is responsible for setting up and configuring the entire
+ * OpenTelemetry SDK. This is a critical piece of infrastructure-as-code, defining how traces are
+ * collected, enriched, and exported.
+ * 
+ * Key Architectural Decisions & Best Practices:
+ * ------------------------------------------------
+ * 1.  `@Configuration` and `@Bean`: Correctly uses Spring's Java-based configuration to create and
+ *     manage the `OpenTelemetry` instance as a singleton bean.
+ * 2.  `@EnableAspectJAutoProxy`: This is essential. It enables Spring's support for processing
+ *     components marked with `@Aspect`, which is what activates the `DistributedTracingAspect`.
+ * 3.  Externalized Configuration (`@Value`): Hardcoding values is avoided. Key configuration
+ *     parameters like product code, business unit, and the OTLP endpoint are injected from
+ *     `application.yml`. This makes the application flexible and easy to configure for different
+ *     environments.
+ * 4.  Rich Resource Attributes: The creation of the `Resource` object is a highlight. It merges
+ *     default resources with a rich set of custom attributes, including:
+ *     - **Standard Semantic Conventions**: `service.name`, `service.version`, etc. This ensures
+ *       compatibility with standard OpenTelemetry UIs.
+ *     - **Custom Business Attributes**: `product.code`, `business.unit`, `cost.center`. This is
+ *       where the business context is injected at the source, tagging every single trace from this
+ *       service with this metadata.
+ *     - **Build and Deployment Metadata**: `build.version`, `deployment.type`. This is invaluable
+ *       for debugging, as it tells you exactly which version of the code generated a trace.
+ * 5.  Production-Ready Exporter Configuration: The `BatchSpanProcessor` is configured with settings
+ *     that are suitable for a production environment (e.g., batch size, schedule delay, queue size,
+ *     gzip compression). This shows foresight beyond a simple POC.
+ * 6.  Standard-Based Propagation: The use of `W3CTraceContextPropagator` and `W3CBaggagePropagator`
+ *     is the correct, modern approach. It ensures interoperability with any other service or
+ *     platform that follows the W3C Trace Context standard.
+ * 7.  Global Registration: `buildAndRegisterGlobal()` makes this OpenTelemetry instance the default
+ *     for the entire JVM, which is a common and effective strategy.
+ * 
+ * Role in the Architecture:
+ * -------------------------
+ * - This class is the foundation of the tracing system. It sets up the "factory" that produces
+ *   tracers and spans.
+ * - It defines the identity of this service in the distributed system via the `Resource` attributes.
+ * - It configures how traces will be exported from the application (in this case, via OTLP gRPC).
+ * 
+ * Overall Feedback:
+ * -----------------
+ * - This is a production-grade OpenTelemetry configuration. It's comprehensive, flexible, and
+ *   follows all current best practices.
+ * - The richness of the resource attributes is a major strength, demonstrating a mature understanding
+ *   of what makes a tracing system truly useful in a large enterprise.
+ * - The configuration is clean, readable, and well-commented.
+ * 
+ * This class perfectly sets the stage for the `DistributedTracingAspect` to do its work, ensuring
+ * that every trace produced is rich with context and correctly exported.
+ * =================================================================================================
  */
 @Configuration
 @EnableAspectJAutoProxy

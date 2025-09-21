@@ -19,21 +19,64 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
 /**
- * Main controller demonstrating complete distributed tracing flow with all Resilience4j patterns.
+ * =================================================================================================
+ * ARCHITECTURAL REVIEW
+ * =================================================================================================
  * 
- * This controller simulates the complete multi-tier architecture discussed in the chat:
- * Controller -> Lambda Service -> EKS Service -> Database
+ * The `ProcessingController` is the main entry point for all incoming HTTP requests. It serves as
+ * the "presentation layer" of this POC and is responsible for orchestrating calls to the service
+ * layer and demonstrating the complete distributed tracing and resilience flow.
  * 
- * Features demonstrated:
- * 1. Complete distributed tracing with business context propagation
- * 2. All Resilience4j patterns in action
- * 3. User context extraction and correlation ID handling
- * 4. Comprehensive error handling with graceful degradation
- * 5. Business annotations for enhanced observability
- * 6. Baggage propagation across service boundaries
+ * Key Architectural Decisions & Best Practices:
+ * ------------------------------------------------
+ * 1.  RESTful Design: The controller follows REST principles, using standard HTTP verbs (`@PostMapping`,
+ *     `@GetMapping`) and clear, hierarchical URL paths (`/api/v1/processing/...`).
+ * 2.  `@RestController`: Correctly combines `@Controller` and `@ResponseBody`, simplifying the code
+ *     by automatically serializing return objects (like `ProcessingResult`) into JSON.
+ * 3.  Dependency Injection: The `ExternalServiceClient` is properly injected via the constructor,
+ *     which is the recommended approach for mandatory dependencies.
+ * 4.  Declarative Business Context: This is a major strength. The controller methods are heavily
+ *     annotated with the custom business annotations (`@FeatureName`, `@ActionType`, `@BusinessOperation`,
+ *     `@CorrelationId`). This makes the business intent of each endpoint immediately clear and allows
+ *     the `DistributedTracingAspect` to work its magic without any imperative code in the controller.
+ * 5.  Orchestration, Not Logic: The `completeProcessingFlow` method is a great example of the
+ *     "Orchestrator" pattern. It doesn't contain any complex business logic itself; instead, it
+ *     sequences and coordinates calls to the `ExternalServiceClient`, which encapsulates the actual
+ *     work. This separation of concerns is excellent.
+ * 6.  Comprehensive Endpoints: The controller provides a rich set of endpoints for demonstrating
+ *     different scenarios:
+ *     - `complete-flow`: The main showcase of the entire architecture.
+ *     - `user-data`: To test caching and rate limiting.
+ *     - `heavy-processing`: To test thread pool bulkhead isolation.
+ *     - `test/{pattern}`: A very useful endpoint for developers to test each resilience pattern
+ *       in isolation.
+ *     - `health` & `info`: Standard endpoints for monitoring and system information.
+ * 7.  Asynchronous Handling: The controller correctly handles `CompletableFuture` returned by the
+ *     service layer by calling `.get()`. This ensures that the HTTP response is not sent until the
+ *     asynchronous operation (which is subject to a `TimeLimiter`) is complete.
+ * 8.  Rich Response Objects: The use of a `ProcessingResult` builder to create detailed, structured
+ *     JSON responses is a best practice. It provides the client with a wealth of information about
+ *     the processing outcome, including status, timing, and business context.
  * 
- * Each endpoint represents a different aspect of the distributed system
- * with varying complexity and resilience patterns.
+ * Role in the Architecture:
+ * -------------------------
+ * - It's the public-facing API of the service.
+ * - It's the first point of contact for incoming requests and therefore the place where the tracing
+ *   context (like correlation ID and user ID) is often initiated or extracted from HTTP headers.
+ * - It orchestrates the business flow by delegating to service-layer components.
+ * 
+ * Overall Feedback:
+ * -----------------
+ * - This is a well-designed, robust, and highly demonstrative controller. It effectively showcases
+ *   all the key features of the POC.
+ * - The use of declarative annotations for cross-cutting concerns is exemplary.
+ * - The logging is thorough and provides good visibility into the execution flow, with clear
+ *   references to business context IDs.
+ * - The error handling is solid, with `try-catch` blocks that create structured error responses.
+ * 
+ * This controller is a strong piece of the architecture, effectively bridging the gap between the
+ * external world (HTTP) and the internal business logic of the application.
+ * =================================================================================================
  */
 @RestController
 @RequestMapping("/api/v1/processing")

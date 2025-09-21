@@ -18,18 +18,72 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * External Service Client demonstrating ALL Resilience4j patterns:
- * 1. Circuit Breaker - Prevents cascading failures by opening circuit when failure rate exceeds threshold
- * 2. Retry - Automatically retries failed operations with exponential backoff
- * 3. Rate Limiter - Controls the rate of requests to prevent service overload
- * 4. Bulkhead - Isolates resources to prevent one slow service from affecting others
- * 5. Time Limiter - Prevents operations from hanging indefinitely
- * 6. Cache - Caches results to improve performance and reduce external calls
+ * =================================================================================================
+ * ARCHITECTURAL REVIEW
+ * =================================================================================================
  * 
- * Each method simulates external service calls (Lambda, EKS, Database) as discussed
- * in the distributed tracing architecture, with comprehensive fault tolerance.
+ * The `ExternalServiceClient` is the workhorse of the application. It's responsible for simulating
+ * calls to external downstream services and is the primary place where the Resilience4j patterns
+ * are applied.
  * 
- * All methods are instrumented with distributed tracing for complete observability.
+ * Key Architectural Decisions & Best Practices:
+ * ------------------------------------------------
+ * 1.  `@Service`: Correctly marks the class as a Spring service, indicating it contains business logic.
+ * 2.  Comprehensive Resilience Patterns: This is the standout feature. The class demonstrates the
+ *     application of all six major Resilience4j patterns, often in combination, which is a realistic
+ *     representation of a production system.
+ *     - `@CircuitBreaker`: Protects against cascading failures.
+ *     - `@Retry`: Handles transient faults.
+ *     - `@RateLimiter`: Prevents overloading downstream services.
+ *     - `@Bulkhead`: Isolates resources (both semaphore and thread pool types are shown).
+ *     - `@TimeLimiter`: Prevents indefinite hangs.
+ *     - `@Cacheable` (Spring Cache): Demonstrates caching for performance.
+ * 3.  Declarative Resilience: All resilience is configured declaratively using annotations. This
+ *     keeps the business logic clean and free from boilerplate resilience code. The configuration
+ *     itself is externalized to `application.yml`, which is a best practice.
+ * 4.  Fallback Methods: Each resilient method has a corresponding fallback method (e.g.,
+ *     `fallbackLambdaCall`). This is crucial for graceful degradation. When a service fails, the
+ *     system doesn't just crash; it provides a sensible default or cached response. The fallback
+ *     methods are well-implemented, logging a warning and returning a structured `ProcessingResult`
+ *     with a "FALLBACK" status.
+ * 5.  Asynchronous Operations (`CompletableFuture`): The use of `CompletableFuture` for methods
+ *     protected by `@TimeLimiter` and `@Bulkhead(type = THREADPOOL)` is correct. These patterns
+ *     require asynchronous execution, and the implementation handles this properly.
+ * 6.  Realistic Simulations: The methods use `Thread.sleep` to simulate network latency and
+ *     `ThreadLocalRandom` to simulate intermittent failures. This is an effective way to test and
+ *     demonstrate the resilience patterns in action.
+ * 7.  Integration with Tracing: The methods are also annotated with `@TraceMethod` and
+ *     `@BusinessOperation`, ensuring that these simulated external calls are fully integrated into
+ *     the distributed trace.
+ * 
+ * Role in the Architecture:
+ * -------------------------
+ * - It represents the "service layer" or "integration layer" of the application.
+ * - It encapsulates the logic for communicating with external dependencies.
+ * - It is the primary location for implementing fault tolerance and resilience policies.
+ * 
+ * Overall Feedback:
+ * -----------------
+ * - This is an outstanding class that serves as a practical, hands-on guide to implementing
+ *   comprehensive resilience with Resilience4j.
+ * - The combination of multiple patterns on single methods (e.g., `@CircuitBreaker`, `@Retry`, and
+ *   `@RateLimiter` on `callLambdaService`) is a powerful demonstration of how these patterns can be
+ *   composed.
+ * - The code is clean, well-commented, and the simulations are realistic enough to be highly
+ *   instructive.
+ * 
+ * Weaknesses/Areas for Improvement:
+ * ---------------------------------
+ * - The use of Spring's `@Cacheable` instead of Resilience4j's `@Cache` is a pragmatic choice, as
+ *   Spring Cache is more commonly used and integrated. However, it's worth noting that it's not
+ *   a "pure" Resilience4j implementation in that one aspect. This is a minor point and a perfectly
+ *   valid architectural decision.
+ * - The `maskSensitiveQuery` method is a good thought for a POC, but as the comment notes, a
+ *   production system would require a much more robust and secure data masking/sanitization library.
+ * 
+ * This class is the highlight of the POC, brilliantly demonstrating how to build a robust,
+ * fault-tolerant application that can withstand the failures of its dependencies.
+ * =================================================================================================
  */
 @Service
 public class ExternalServiceClient {
