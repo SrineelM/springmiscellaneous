@@ -68,7 +68,7 @@ This POC simulates a real-world distributed architecture commonly found in enter
 - **Configuration**: 50% failure rate threshold, 10-call sliding window
 - **Fallback**: Graceful degradation with cached responses
 
-#### 2. Retry Pattern  
+#### 2. Retry Pattern
 ```java
 @Retry(name = "lambdaService")
 ```
@@ -96,7 +96,7 @@ This POC simulates a real-world distributed architecture commonly found in enter
 ```java
 @TimeLimiter(name = "databaseService")
 ```
-- **Purpose**: Prevents operations from hanging indefinitely  
+- **Purpose**: Prevents operations from hanging indefinitely
 - **Configuration**: 3-second timeout with future cancellation
 - **Usage**: Async operations with CompletableFuture
 
@@ -114,7 +114,7 @@ This POC simulates a real-world distributed architecture commonly found in enter
 ```java
 @BusinessOperation(
     name = "complete-processing-flow",
-    category = "request-processing", 
+    category = "request-processing",
     criticality = "high",
     expectedDuration = "slow"
 )
@@ -204,7 +204,7 @@ curl -X POST http://localhost:8080/api/v1/processing/complete-flow \
 - ✅ Business context extraction from headers
 - ✅ Custom business ID generation
 - ✅ Circuit Breaker (Lambda service simulation)
-- ✅ Bulkhead (EKS service simulation) 
+- ✅ Bulkhead (EKS service simulation)
 - ✅ Time Limiter (Database operations)
 - ✅ Retry mechanisms
 - ✅ Rate limiting
@@ -257,7 +257,7 @@ curl "http://localhost:8080/api/v1/processing/test/rate-limiter?userId=rl-test"
 # Bulkhead
 curl "http://localhost:8080/api/v1/processing/test/bulkhead?userId=bulkhead-test"
 
-# Time Limiter  
+# Time Limiter
 curl "http://localhost:8080/api/v1/processing/test/time-limiter?userId=tl-test"
 
 # Cache
@@ -287,7 +287,7 @@ Monitor all Resilience4j patterns in real-time:
 # Circuit Breaker Status
 curl http://localhost:8080/actuator/circuitbreakers
 
-# Rate Limiter Metrics  
+# Rate Limiter Metrics
 curl http://localhost:8080/actuator/ratelimiters
 
 # Retry Statistics
@@ -303,13 +303,19 @@ curl http://localhost:8080/actuator/timelimiters
 curl http://localhost:8080/actuator/metrics
 ```
 
+Tip: In production, authenticate to non-public endpoints:
+
+```bash
+curl -u "$ACTUATOR_USER:$ACTUATOR_PASSWORD" http://localhost:8080/actuator/metrics
+```
+
 ### Sample Circuit Breaker Response
 ```json
 {
   "circuitBreakers": {
     "lambdaService": {
       "failureRate": "25.0%",
-      "slowCallRate": "10.0%", 
+      "slowCallRate": "10.0%",
       "failureRateThreshold": "50.0%",
       "state": "CLOSED",
       "bufferedCalls": 8,
@@ -348,7 +354,7 @@ Business context automatically flows across all services:
 ```json
 {
   "business.transaction.id": "ECOM-POC-DEV-20250920135400-001234-A7F3",
-  "business.correlation.id": "COR-ECOM-POC-12AB34CD-E5F6789A", 
+  "business.correlation.id": "COR-ECOM-POC-12AB34CD-E5F6789A",
   "business.product.code": "ECOM-POC",
   "user.id": "john-doe-123",
   "action.type": "COMPLETE_PROCESSING"
@@ -374,7 +380,7 @@ src/main/java/com/example/poc/
 │   ├── ActionType.java
 │   ├── TraceMethod.java
 │   └── ...
-├── aspect/             # AspectJ tracing implementation  
+├── aspect/             # AspectJ tracing implementation
 │   └── DistributedTracingAspect.java
 ├── config/             # OpenTelemetry configuration
 │   └── TracingConfiguration.java
@@ -422,16 +428,16 @@ resilience4j:
         failure-rate-threshold: 50
         sliding-window-size: 10
         wait-duration-in-open-state: 10s
-  
+
   retry:
     instances:
       lambdaService:
         max-attempts: 3
         wait-duration: 1s
         exponential-backoff-multiplier: 2
-  
+
   ratelimiter:
-    instances:  
+    instances:
       lambdaService:
         limit-for-period: 10
         limit-refresh-period: 1s
@@ -458,7 +464,7 @@ management:
       correlation:
         fields: user_id,action_type,session_id
       remote-fields: user_id,action_type,business_transaction_id
-  
+
   otlp:
     tracing:
       endpoint: http://localhost:4317  # ADOT Collector ready
@@ -487,7 +493,7 @@ Custom business context flows automatically:
 ```java
 @BusinessOperation(
     name = "payment-processing",
-    category = "financial", 
+    category = "financial",
     criticality = "critical",
     sensitive = true
 )
@@ -579,7 +585,7 @@ resilience4j:
         failure-rate-threshold: 30  # More lenient in dev
 
 ---
-# Production Environment  
+# Production Environment
 spring:
   profiles: prod
 resilience4j:
@@ -655,7 +661,7 @@ Look for these key log patterns:
 # Successful tracing
 grep "Trace completed successfully" logs/application.log
 
-# Circuit breaker events  
+# Circuit breaker events
 grep "CircuitBreaker.*changed state" logs/application.log
 
 # Retry attempts
@@ -747,7 +753,7 @@ grep "RateLimiter.*permit" logs/application.log
 This POC demonstrates **enterprise-grade distributed tracing and resilience patterns** in a production-ready Spring Boot application. It showcases:
 
 - ✅ **Complete OpenTelemetry integration** with business context
-- ✅ **All 6 Resilience4j patterns** working together seamlessly  
+- ✅ **All 6 Resilience4j patterns** working together seamlessly
 - ✅ **Automatic instrumentation** with zero code intrusion
 - ✅ **Production monitoring** and observability
 - ✅ **AWS X-Ray compatibility** for cloud deployment
@@ -767,3 +773,108 @@ For questions about this POC:
 ---
 
 **Built with ❤️ using Spring Boot, OpenTelemetry, and Resilience4j**
+
+---
+
+## 🧭 OpenTelemetry vs. Micrometer Tracing (Opinion)
+
+This POC favors a custom OpenTelemetry (OTel) SDK configuration for maximum control over span processors, exporters, samplers, and resource attributes.
+
+- Why OTel here: vendor-neutral, highly customizable, and ideal for encoding rich business semantics into spans while precisely controlling export pipelines.
+- When to prefer Micrometer Tracing: if you want property-driven Spring autoconfiguration with minimal custom code and strong alignment to the Micrometer ecosystem.
+
+Both work well together. If you standardize on Micrometer, consider removing the custom OTel SDK beans and drive configuration via `management.tracing.*` properties.
+
+### How to Enable Micrometer Tracing (Alternative Path)
+
+1) Dependencies
+- Keep: `org.springframework.boot:spring-boot-starter-actuator`
+- Add: `io.micrometer:micrometer-tracing-bridge-otel`
+- Optionally remove the manual OpenTelemetry SDK beans to let Spring autoconfigure tracing entirely.
+
+2) Properties (application.yml)
+```yaml
+management:
+  tracing:
+    sampling:
+      probability: 1.0
+    baggage:
+      # Keep dotted keys to match code; Micrometer can propagate arbitrary keys
+      correlation:
+        fields: user.id,action.type,user.session.id,business.transaction.id,business.correlation.id
+      remote-fields: user.id,action.type,user.session.id,business.transaction.id,business.correlation.id
+  otlp:
+    tracing:
+      endpoint: http://localhost:4317
+```
+
+3) Remove/Adjust Custom SDK
+- If you keep the custom `OpenTelemetry` bean, Micrometer will still run, but Spring properties won’t control that custom SDK. For a clean Micrometer-driven setup, remove the custom beans and rely on autoconfiguration.
+
+4) Verify
+- Exercise endpoints and confirm traces appear in your backend; validate baggage propagation by inspecting headers and attributes.
+
+5) Notes on baggage naming
+- This repo standardizes on dotted baggage keys (e.g., `user.id`, `business.transaction.id`).
+- If your org prefers snake_case, change both the code references in `DistributedTracingAspect` and the Micrometer `management.tracing.baggage.*` properties to keep them aligned.
+
+6) Retain OTel as primary
+- This POC keeps the custom OpenTelemetry SDK path for maximum control. Micrometer steps above are an optional alternative; don’t enable both control planes at once in production.
+
+### AOP span volume tuning
+- Under high load, creating spans for both controllers and services can be noisy and increase cost.
+- Strategy options:
+  - Annotation-only: Remove layer pointcuts and rely on `@TraceMethod`/`@BusinessOperation` only on critical paths.
+  - Layer scoping: Keep controller spans as SERVER and disable service INTERNAL spans for hot paths.
+  - Sampling: Reduce sampling rates in prod (already set to 10% in `prod` profile) and add head-based rules.
+  - Event-focused: Use span events for fine-grained details instead of separate spans.
+
+### Dependency hygiene (what we streamlined and why)
+- Resilience4j: Kept only the Spring Boot 3 starter plus Micrometer binding. Removed individual core modules to avoid duplicate classes/version skew.
+- AspectJ weaver: Omitted explicit dependency since `spring-boot-starter-aop` already provides it.
+- Logging: Included Logstash JSON encoder but left adoption optional; remove it if you don’t use JSON logging.
+- Tracing: Kept both `micrometer-tracing-bridge-otel` and OTLP exporter so you can choose control plane; pick one for production.
+
+### Prioritized recommendations implemented
+- Keep OTel SDK as primary control plane; provide Micrometer instructions as an alternative.
+- Standardize baggage naming on dotted keys; properties updated accordingly.
+- Guard Actuator endpoints with HTTP Basic; only health/info are public (see Security section).
+- Streamline dependencies and annotate build with rationale.
+- Add inline comments explaining product code sourcing, instanceId purpose, and span volume guidance.
+
+## 🔐 Security for Actuator (NEW)
+
+- Actuator endpoints require HTTP Basic authentication, except `/actuator/health` and `/actuator/info` which remain public by default.
+- Set credentials via environment variables (dev defaults shown):
+
+```bash
+export ACTUATOR_USER=actuator
+export ACTUATOR_PASSWORD=actuator
+```
+
+- Production guidance:
+  - Use an external identity provider (OIDC/LDAP) and disable in-memory users.
+  - Restrict exposed endpoints in the `prod` profile (this repo limits to `health,info`).
+  - Consider a separate management port and network policies.
+
+To query authenticated metrics in production:
+
+```bash
+curl -u "$ACTUATOR_USER:$ACTUATOR_PASSWORD" http://localhost:8080/actuator/metrics
+```
+
+## 🧹 Code Style with Spotless (NEW)
+
+- The build attempts to auto-format code via Spotless and continues without failing if changes are needed.
+- To format manually:
+
+```bash
+./gradlew spotlessApply
+```
+
+## 📌 Update Notes (2025-09-21)
+
+- Upgraded to Spring Boot 3.5.x.
+- Refreshed Resilience4j and OpenTelemetry exporter versions.
+- Added Spring Security to protect Actuator endpoints.
+- Added Spotless plugin for automated code formatting.

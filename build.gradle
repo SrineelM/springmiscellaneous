@@ -1,7 +1,10 @@
+// NOTE (architectural): Spring Boot bumped to 3.5.x to align with latest fixes and API stability.
+// Spotless is added to auto-format code, but configured to not fail the build if it needs to apply changes.
 plugins {
-    id 'org.springframework.boot' version '3.2.0'
-    id 'io.spring.dependency-management' version '1.1.4'
+    id 'org.springframework.boot' version '3.5.0'
+    id 'io.spring.dependency-management' version '1.1.6'
     id 'java'
+    id 'com.diffplug.spotless' version '6.25.0'
 }
 
 group = 'com.example'
@@ -21,9 +24,12 @@ repositories {
     mavenCentral()
 }
 
+// NOTE (observability stack): We keep both the Micrometer bridge and manual OTel exporter available.
+// This allows either (a) custom OTel SDK configuration or (b) Micrometer Tracing autoconfiguration.
+// If you standardize on Micrometer, you can remove the custom OTel SDK beans and keep the bridge only.
 ext {
-    set('openTelemetryVersion', '1.32.0')
-    set('resilience4jVersion', '2.1.0')
+    set('openTelemetryVersion', '1.40.0')
+    set('resilience4jVersion', '2.3.0')
 }
 
 dependencies {
@@ -32,26 +38,27 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-actuator'
     implementation 'org.springframework.boot:spring-boot-starter-cache'
     implementation 'org.springframework.boot:spring-boot-starter-aop'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
     
-    // OpenTelemetry Dependencies for distributed tracing
+    // OpenTelemetry Dependencies for distributed tracing (manual SDK path kept for flexibility).
+    // If you prefer Micrometer-only, keep the bridge and remove manual SDK beans.
     implementation 'io.micrometer:micrometer-tracing-bridge-otel'
     implementation 'io.opentelemetry:opentelemetry-exporter-otlp'
     
-    // Resilience4j Dependencies - All modules for comprehensive fault tolerance
+    // Resilience4j Dependencies - streamline to Spring Boot 3 starter.
+    // NOTE (dependency hygiene): The starter transitively brings the core modules
+    // (circuitbreaker, ratelimiter, retry, bulkhead, timelimiter, cache).
+    // Keep the starter only to avoid duplicate classes and version drift.
     implementation "io.github.resilience4j:resilience4j-spring-boot3:${resilience4jVersion}"
-    implementation "io.github.resilience4j:resilience4j-circuitbreaker:${resilience4jVersion}"
-    implementation "io.github.resilience4j:resilience4j-ratelimiter:${resilience4jVersion}"
-    implementation "io.github.resilience4j:resilience4j-retry:${resilience4jVersion}"
-    implementation "io.github.resilience4j:resilience4j-bulkhead:${resilience4jVersion}"
-    implementation "io.github.resilience4j:resilience4j-timelimiter:${resilience4jVersion}"
-    implementation "io.github.resilience4j:resilience4j-cache:${resilience4jVersion}"
+    // Optional: metrics binding. Keep if you want dedicated Resilience4j metrics via Micrometer.
     implementation "io.github.resilience4j:resilience4j-micrometer:${resilience4jVersion}"
     
     // AspectJ for AOP support
-    implementation 'org.aspectj:aspectjweaver'
+    // Brought transitively by spring-boot-starter-aop; no need to declare explicitly.
     
     // JSON logging for structured logs with trace context
-    implementation 'net.logstash.logback:logstash-logback-encoder:7.4'
+    // JSON logging encoder. Either adopt JSON logging in logback-spring.xml, or remove this dependency to simplify.
+    implementation 'net.logstash.logback:logstash-logback-encoder:8.0'
     
     // Caffeine cache for better caching performance
     implementation 'com.github.ben-manes.caffeine:caffeine'
@@ -59,10 +66,7 @@ dependencies {
     // Testing dependencies
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.testcontainers:junit-jupiter'
-    // Add Hamcrest for containsString matcher
     testImplementation 'org.hamcrest:hamcrest:2.2'
-    // Add Spring MockMvc for @AutoConfigureMockMvc (if not already included)
-    testImplementation 'org.springframework.boot:spring-boot-starter-web'
     
     // Development tools
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
@@ -71,4 +75,38 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+}
+
+// Spotless: format sources, but do not fail the build if formatting issues are found (non-blocking developer ergonomics)
+spotless {
+    java {
+        googleJavaFormat()
+        toggleOffOn()
+        indentWithSpaces(4)
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+    format 'misc', {
+        target '**/*.md', '**/.gitignore'
+        indentWithSpaces(2)
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+}
+
+// Make formatting non-blocking: attempt to apply on each build, but do not fail if something slips through.
+tasks.register('spotlessWarn') {
+    group = 'formatting'
+    description = 'Runs Spotless check but does not fail the build.'
+    doLast {
+        try {
+            tasks.named('spotlessApply').get().execute()
+        } catch (Exception ignored) {
+            logger.lifecycle('Spotless formatting attempted; continuing without failing the build.')
+        }
+    }
+}
+
+tasks.named('build') {
+    dependsOn 'spotlessWarn'
 }
