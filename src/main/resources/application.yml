@@ -1,0 +1,366 @@
+# Comprehensive Configuration for Distributed Tracing with Resilience4j POC
+# This configuration implements all features discussed in the chat
+
+server:
+  port: 8080
+  servlet:
+    context-path: /
+  tomcat:
+    max-threads: 200
+    accept-count: 100
+
+spring:
+  application:
+    name: distributed-tracing-resilience-poc
+  profiles:
+    active: dev
+  
+  # Cache Configuration for Resilience4j Cache pattern
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=1000,expireAfterWrite=300s
+  
+  # Jackson Configuration for JSON processing
+  jackson:
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+
+# Custom Application Properties as discussed in the chat
+app:
+  product:
+    code: ECOM-POC
+  business:
+    unit: customer-experience
+  cost:
+    center: CC-2025-001
+  data:
+    classification: internal
+
+# OpenTelemetry and Tracing Configuration
+management:
+  # Tracing configuration implementing chat requirements
+  tracing:
+    sampling:
+      probability: 1.0  # 100% sampling for POC - use lower values in production
+    baggage:
+      correlation:
+        fields: user_id,action_type,session_id,business_transaction_id,correlation_id
+      remote-fields: user_id,action_type,session_id,business_transaction_id,correlation_id
+  
+  # OTLP Exporter Configuration - Compatible with AWS X-Ray via ADOT Collector
+  otlp:
+    tracing:
+      endpoint: http://localhost:4317  # OTLP gRPC endpoint
+      # endpoint: http://localhost:4318/v1/traces  # OTLP HTTP endpoint alternative
+      compression: gzip
+      timeout: 10s
+  
+  # Actuator Configuration for monitoring all Resilience4j patterns
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,circuitbreakers,ratelimiters,retries,bulkheads,timelimiters,caches,traces
+      base-path: /actuator
+  
+  endpoint:
+    health:
+      show-details: always
+      show-components: always
+    metrics:
+      enabled: true
+
+# Comprehensive Resilience4j Configuration - ALL PATTERNS
+resilience4j:
+  
+  # Circuit Breaker Configuration - Prevents cascading failures
+  circuitbreaker:
+    configs:
+      default:
+        failure-rate-threshold: 50        # Open circuit when 50% failure rate
+        slow-call-rate-threshold: 50      # Consider slow calls in failure rate
+        slow-call-duration-threshold: 2s  # Call is slow if > 2 seconds
+        sliding-window-type: count_based   # Use count-based sliding window
+        sliding-window-size: 10           # Consider last 10 calls
+        minimum-number-of-calls: 5        # Minimum calls before evaluation
+        wait-duration-in-open-state: 10s  # Wait 10s before trying half-open
+        permitted-number-of-calls-in-half-open-state: 3
+        automatic-transition-from-open-to-half-open-enabled: true
+        event-consumer-buffer-size: 10
+        record-exceptions:
+          - java.lang.RuntimeException
+          - java.util.concurrent.TimeoutException
+          - java.net.ConnectException
+        ignore-exceptions:
+          - java.lang.IllegalArgumentException
+    instances:
+      lambdaService:
+        base-config: default
+        failure-rate-threshold: 60
+        wait-duration-in-open-state: 15s
+      eksService:
+        base-config: default
+        failure-rate-threshold: 40
+        sliding-window-size: 8
+        wait-duration-in-open-state: 12s
+      databaseService:
+        base-config: default
+        failure-rate-threshold: 30
+        sliding-window-size: 12
+        wait-duration-in-open-state: 20s
+      combinedService:
+        base-config: default
+        failure-rate-threshold: 45
+        sliding-window-size: 15
+        wait-duration-in-open-state: 8s
+
+  # Retry Configuration - Automatic retry with exponential backoff
+  retry:
+    configs:
+      default:
+        max-attempts: 3
+        wait-duration: 1s
+        exponential-backoff-multiplier: 2
+        exponential-max-wait-duration: 10s
+        retry-exceptions:
+          - java.lang.RuntimeException
+          - java.util.concurrent.TimeoutException
+          - java.net.ConnectException
+        ignore-exceptions:
+          - java.lang.IllegalArgumentException
+    instances:
+      lambdaService:
+        base-config: default
+        max-attempts: 4
+        wait-duration: 500ms
+        exponential-backoff-multiplier: 1.5
+      eksService:
+        base-config: default
+        max-attempts: 3
+        wait-duration: 2s
+        exponential-backoff-multiplier: 2
+      databaseService:
+        base-config: default
+        max-attempts: 2
+        wait-duration: 3s
+        exponential-backoff-multiplier: 1.2
+      combinedService:
+        base-config: default
+        max-attempts: 3
+        wait-duration: 1s
+
+  # Rate Limiter Configuration - Controls request rate
+  ratelimiter:
+    configs:
+      default:
+        limit-refresh-period: 1s
+        limit-for-period: 10
+        timeout-duration: 0s  # Don't wait if limit exceeded
+        event-consumer-buffer-size: 100
+    instances:
+      lambdaService:
+        base-config: default
+        limit-for-period: 15
+        timeout-duration: 100ms
+      userService:
+        base-config: default
+        limit-for-period: 20
+        timeout-duration: 500ms
+      eksService:
+        base-config: default
+        limit-for-period: 8
+        timeout-duration: 200ms
+      combinedService:
+        base-config: default
+        limit-for-period: 5
+        timeout-duration: 0s
+
+  # Bulkhead Configuration - Isolates resources (Semaphore-based)
+  bulkhead:
+    configs:
+      default:
+        max-concurrent-calls: 5
+        max-wait-duration: 1s
+        event-consumer-buffer-size: 100
+    instances:
+      eksService:
+        base-config: default
+        max-concurrent-calls: 3
+        max-wait-duration: 2s
+      databaseService:
+        base-config: default
+        max-concurrent-calls: 8
+        max-wait-duration: 500ms
+      combinedService:
+        base-config: default
+        max-concurrent-calls: 2
+        max-wait-duration: 1s
+
+  # Thread Pool Bulkhead Configuration - Isolates thread pools
+  thread-pool-bulkhead:
+    configs:
+      default:
+        max-thread-pool-size: 4
+        core-thread-pool-size: 2
+        queue-capacity: 10
+        keep-alive-duration: 20s
+        event-consumer-buffer-size: 100
+    instances:
+      combinedService:
+        base-config: default
+        max-thread-pool-size: 6
+        core-thread-pool-size: 3
+        queue-capacity: 15
+      heavyProcessingService:
+        base-config: default
+        max-thread-pool-size: 8
+        core-thread-pool-size: 4
+        queue-capacity: 20
+
+  # Time Limiter Configuration - Prevents hanging operations
+  timelimiter:
+    configs:
+      default:
+        timeout-duration: 3s
+        cancel-running-future: true
+        event-consumer-buffer-size: 100
+    instances:
+      databaseService:
+        base-config: default
+        timeout-duration: 5s
+        cancel-running-future: true
+      lambdaService:
+        base-config: default
+        timeout-duration: 2s
+      eksService:
+        base-config: default
+        timeout-duration: 4s
+      combinedService:
+        base-config: default
+        timeout-duration: 6s
+
+  # Cache Configuration (Resilience4j Cache pattern)
+  cache:
+    configs:
+      default:
+        event-consumer-buffer-size: 100
+    instances:
+      userDataCache:
+        event-consumer-buffer-size: 50
+      operationCache:
+        event-consumer-buffer-size: 100
+      combinedCache:
+        event-consumer-buffer-size: 75
+
+  # Metrics Configuration for monitoring
+  metrics:
+    enabled: true
+    use-legacy-binder: false
+
+# Caffeine Cache Configuration (used by Resilience4j Cache)
+caffeine:
+  caches:
+    userDataCache:
+      expire-after-write: 300s      # 5 minutes
+      maximum-size: 1000
+      metrics: true
+    operationCache:
+      expire-after-write: 180s      # 3 minutes
+      maximum-size: 500
+      metrics: true
+    combinedCache:
+      expire-after-write: 240s      # 4 minutes
+      maximum-size: 750
+      metrics: true
+
+# Logging Configuration with structured logging and trace context
+logging:
+  level:
+    root: INFO
+    com.example.poc: DEBUG
+    io.github.resilience4j: DEBUG
+    io.opentelemetry: INFO
+    org.springframework.web: DEBUG
+    org.springframework.cache: DEBUG
+  
+  # Pattern for console output with trace context
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{traceId:-},%X{spanId:-}] [%X{businessTransactionId:-}] [%X{correlationId:-}] [%X{userId:-}] %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{traceId:-},%X{spanId:-}] [%X{businessTransactionId:-}] [%X{correlationId:-}] [%X{userId:-}] %logger{36} - %msg%n"
+  
+  # Optional: Log to file for production
+  file:
+    name: logs/distributed-tracing-poc.log
+    max-size: 100MB
+    max-history: 30
+
+# Development Profile Specific Configuration
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+# More permissive settings for development
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        failure-rate-threshold: 70  # Higher threshold for dev
+        minimum-number-of-calls: 3
+
+logging:
+  level:
+    com.example.poc: TRACE        # More verbose logging in dev
+
+---
+# Production Profile Specific Configuration
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+# Stricter settings for production
+management:
+  tracing:
+    sampling:
+      probability: 0.1            # 10% sampling in production
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        failure-rate-threshold: 30  # Stricter threshold for prod
+        minimum-number-of-calls: 10
+
+logging:
+  level:
+    com.example.poc: INFO         # Less verbose in production
+
+---
+# Test Profile Specific Configuration
+spring:
+  config:
+    activate:
+      on-profile: test
+
+# Fast settings for testing
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        wait-duration-in-open-state: 1s  # Faster recovery for tests
+  retry:
+    configs:
+      default:
+        wait-duration: 100ms            # Faster retries for tests
+  ratelimiter:
+    configs:
+      default:
+        limit-for-period: 100           # Higher limits for tests
+
+management:
+  tracing:
+    sampling:
+      probability: 1.0                 # Full sampling for tests
