@@ -171,18 +171,36 @@ public class TracingConfiguration {
     return builder.build();
   }
 
-  /** Creates OpenTelemetry SDK from the tracer provider and registers W3C propagators. */
+  /**
+   * Creates OpenTelemetry SDK from the tracer provider and registers W3C propagators.
+   * In non-test profiles, also registers as the GlobalOpenTelemetry instance.
+   */
   @Bean
+  @Profile("!test")
   public OpenTelemetry openTelemetry(SdkTracerProvider sdkTracerProvider) {
-    return OpenTelemetrySdk.builder()
-        .setTracerProvider(sdkTracerProvider)
-        .setPropagators(
-            ContextPropagators.create(
-                TextMapPropagator.composite(
-                    W3CTraceContextPropagator.getInstance(), // Standard trace context
-                    W3CBaggagePropagator.getInstance() // Business context propagation
-                    )))
-        .buildAndRegisterGlobal();
+  return OpenTelemetrySdk.builder()
+    .setTracerProvider(sdkTracerProvider)
+    .setPropagators(
+      ContextPropagators.create(
+        TextMapPropagator.composite(
+          W3CTraceContextPropagator.getInstance(), // Standard trace context
+          W3CBaggagePropagator.getInstance() // Business context propagation
+          )))
+    .buildAndRegisterGlobal();
+  }
+
+  /** Test profile variant: do not register as global to avoid cross-context conflicts in JVM. */
+  @Bean
+  @Profile("test")
+  public OpenTelemetry openTelemetryForTests(SdkTracerProvider sdkTracerProvider) {
+  return OpenTelemetrySdk.builder()
+    .setTracerProvider(sdkTracerProvider)
+    .setPropagators(
+      ContextPropagators.create(
+        TextMapPropagator.composite(
+          W3CTraceContextPropagator.getInstance(),
+          W3CBaggagePropagator.getInstance())))
+    .build();
   }
 
   /**
