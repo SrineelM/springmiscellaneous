@@ -785,6 +785,41 @@ This POC favors a custom OpenTelemetry (OTel) SDK configuration for maximum cont
 
 Both work well together. If you standardize on Micrometer, consider removing the custom OTel SDK beans and drive configuration via `management.tracing.*` properties.
 
+## Micrometer Tracing demo (NEW)
+
+This repo includes a minimal, annotation-first Micrometer example that coexists with the custom OTel setup:
+
+- Controller: `MtrCustomerController` (GET `/api/v1/mtr/customers/{id}`)
+- Service: `MtrCustomerService`
+- Repository: `MtrCustomerRepository`
+- All annotated with `@Observed(...)` and enabled via `ObservedAspect` bean in `MicrometerObservationConfig`.
+
+Bridging to OTel: dependency `io.micrometer:micrometer-tracing-bridge-otel` is added. With this and the aspect, Micrometer observations create OTel spans that appear alongside the custom AOP spans.
+
+Verify locally:
+
+```bash
+# Start app
+./gradlew bootRun
+
+# Hit the Micrometer endpoint
+curl http://localhost:8080/api/v1/mtr/customers/42
+
+# Check metrics
+curl http://localhost:8080/actuator/metrics | jq
+curl "http://localhost:8080/actuator/metrics/http.server.requests" | jq
+```
+
+Tests:
+
+- Unit: `MtrCustomerServiceTest` verifies deterministic mock behavior.
+- Integration: `MtrTracingIntegrationTest` boots Spring with an in-memory OTel exporter and asserts that controller/service/repository observations produced OTel spans (names/tags like `mtr.customer.*`, `customer.id`).
+
+Notes:
+
+- Keep observation names low-cardinality. Favor stable names and tag with `lowCardinalityKeyValues`.
+- In production, pick a single control plane (Micrometer or custom OTel). This POC keeps custom OTel primary and uses Micrometer for demo.
+
 ### How to Enable Micrometer Tracing (Alternative Path)
 
 1) Dependencies

@@ -17,54 +17,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * =================================================================================================
- * ARCHITECTURAL REVIEW
- * =================================================================================================
- *
- * <p>The `ProcessingController` is the main entry point for all incoming HTTP requests. It serves
- * as the "presentation layer" of this POC and is responsible for orchestrating calls to the service
- * layer and demonstrating the complete distributed tracing and resilience flow.
- *
- * <p>Key Architectural Decisions & Best Practices: ------------------------------------------------
- * 1. RESTful Design: The controller follows REST principles, using standard HTTP verbs
- * (`@PostMapping`, `@GetMapping`) and clear, hierarchical URL paths (`/api/v1/processing/...`). 2.
- * `@RestController`: Correctly combines `@Controller` and `@ResponseBody`, simplifying the code by
- * automatically serializing return objects (like `ProcessingResult`) into JSON. 3. Dependency
- * Injection: The `ExternalServiceClient` is properly injected via the constructor, which is the
- * recommended approach for mandatory dependencies. 4. Declarative Business Context: This is a major
- * strength. The controller methods are heavily annotated with the custom business annotations
- * (`@FeatureName`, `@ActionType`, `@BusinessOperation`, `@CorrelationId`). This makes the business
- * intent of each endpoint immediately clear and allows the `DistributedTracingAspect` to work its
- * magic without any imperative code in the controller. 5. Orchestration, Not Logic: The
- * `completeProcessingFlow` method is a great example of the "Orchestrator" pattern. It doesn't
- * contain any complex business logic itself; instead, it sequences and coordinates calls to the
- * `ExternalServiceClient`, which encapsulates the actual work. This separation of concerns is
- * excellent. 6. Comprehensive Endpoints: The controller provides a rich set of endpoints for
- * demonstrating different scenarios: - `complete-flow`: The main showcase of the entire
- * architecture. - `user-data`: To test caching and rate limiting. - `heavy-processing`: To test
- * thread pool bulkhead isolation. - `test/{pattern}`: A very useful endpoint for developers to test
- * each resilience pattern in isolation. - `health` & `info`: Standard endpoints for monitoring and
- * system information. 7. Asynchronous Handling: The controller correctly handles
- * `CompletableFuture` returned by the service layer by calling `.get()`. This ensures that the HTTP
- * response is not sent until the asynchronous operation (which is subject to a `TimeLimiter`) is
- * complete. 8. Rich Response Objects: The use of a `ProcessingResult` builder to create detailed,
- * structured JSON responses is a best practice. It provides the client with a wealth of information
- * about the processing outcome, including status, timing, and business context.
- *
- * <p>Role in the Architecture: ------------------------- - It's the public-facing API of the
- * service. - It's the first point of contact for incoming requests and therefore the place where
- * the tracing context (like correlation ID and user ID) is often initiated or extracted from HTTP
- * headers. - It orchestrates the business flow by delegating to service-layer components.
- *
- * <p>Overall Feedback: ----------------- - This is a well-designed, robust, and highly
- * demonstrative controller. It effectively showcases all the key features of the POC. - The use of
- * declarative annotations for cross-cutting concerns is exemplary. - The logging is thorough and
- * provides good visibility into the execution flow, with clear references to business context IDs.
- * - The error handling is solid, with `try-catch` blocks that create structured error responses.
- *
- * <p>This controller is a strong piece of the architecture, effectively bridging the gap between
- * the external world (HTTP) and the internal business logic of the application.
- * =================================================================================================
+ * REST controller that orchestrates the demo processing flow.
+ * Uses business annotations to enrich traces and returns structured
+ * {@link com.example.poc.model.ProcessingResult} responses. Comments trimmed for brevity.
  */
 @RestController
 @RequestMapping("/api/v1/processing")
@@ -78,16 +33,7 @@ public class ProcessingController {
     this.externalServiceClient = externalServiceClient;
   }
 
-  /**
-   * Main endpoint demonstrating complete distributed tracing flow.
-   *
-   * <p>This endpoint simulates the complete architecture: 1. Controller receives request (Layer 1 -
-   * On-premises monolith) 2. Calls Lambda service (Layer 2 - AWS Lambda Python microservice) 3.
-   * Calls EKS service (Layer 3 - EKS Java Spring microservice) 4. Performs database operation (Data
-   * layer) 5. Executes complex business logic (Business layer)
-   *
-   * <p>All with comprehensive tracing, resilience patterns, and business context.
-   */
+  /** Main demo endpoint that orchestrates downstream calls and assembles a rich result. */
   @PostMapping("/complete-flow")
   @ActionType("COMPLETE_PROCESSING")
   @CorrelationId(generate = true, headerName = "X-Correlation-ID")
@@ -233,10 +179,7 @@ public class ProcessingController {
     }
   }
 
-  /**
-   * Endpoint demonstrating caching behavior with Rate Limiter. First call hits the service,
-   * subsequent calls use cache.
-   */
+  /** Demonstrates caching with a rate limiter; subsequent calls are served from cache. */
   @GetMapping("/user-data/{userId}")
   @ActionType("USER_DATA_FETCH")
   @BusinessOperation(
@@ -283,10 +226,7 @@ public class ProcessingController {
     }
   }
 
-  /**
-   * Endpoint demonstrating heavy processing with Thread Pool Bulkhead isolation. Uses separate
-   * thread pool to prevent resource exhaustion.
-   */
+  /** Heavy processing isolated via thread-pool bulkhead to prevent resource exhaustion. */
   @PostMapping("/heavy-processing")
   @ActionType("HEAVY_PROCESSING")
   @BusinessOperation(
@@ -341,9 +281,7 @@ public class ProcessingController {
     }
   }
 
-  /**
-   * Endpoint to test individual resilience patterns. Allows testing specific patterns in isolation.
-   */
+  /** Test specific resilience patterns (CB, retry, bulkhead, etc.) in isolation. */
   @GetMapping("/test/{pattern}")
   @ActionType("PATTERN_TEST")
   @BusinessOperation(

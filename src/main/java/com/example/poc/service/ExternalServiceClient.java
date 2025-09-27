@@ -16,60 +16,9 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 /**
- * =================================================================================================
- * ARCHITECTURAL REVIEW
- * =================================================================================================
- *
- * <p>The `ExternalServiceClient` is the workhorse of the application. It's responsible for
- * simulating calls to external downstream services and is the primary place where the Resilience4j
- * patterns are applied.
- *
- * <p>Key Architectural Decisions & Best Practices: ------------------------------------------------
- * 1. `@Service`: Correctly marks the class as a Spring service, indicating it contains business
- * logic. 2. Comprehensive Resilience Patterns: This is the standout feature. The class demonstrates
- * the application of all six major Resilience4j patterns, often in combination, which is a
- * realistic representation of a production system. - `@CircuitBreaker`: Protects against cascading
- * failures. - `@Retry`: Handles transient faults. - `@RateLimiter`: Prevents overloading downstream
- * services. - `@Bulkhead`: Isolates resources (both semaphore and thread pool types are shown). -
- * `@TimeLimiter`: Prevents indefinite hangs. - `@Cacheable` (Spring Cache): Demonstrates caching
- * for performance. 3. Declarative Resilience: All resilience is configured declaratively using
- * annotations. This keeps the business logic clean and free from boilerplate resilience code. The
- * configuration itself is externalized to `application.yml`, which is a best practice. 4. Fallback
- * Methods: Each resilient method has a corresponding fallback method (e.g., `fallbackLambdaCall`).
- * This is crucial for graceful degradation. When a service fails, the system doesn't just crash; it
- * provides a sensible default or cached response. The fallback methods are well-implemented,
- * logging a warning and returning a structured `ProcessingResult` with a "FALLBACK" status. 5.
- * Asynchronous Operations (`CompletableFuture`): The use of `CompletableFuture` for methods
- * protected by `@TimeLimiter` and `@Bulkhead(type = THREADPOOL)` is correct. These patterns require
- * asynchronous execution, and the implementation handles this properly. 6. Realistic Simulations:
- * The methods use `Thread.sleep` to simulate network latency and `ThreadLocalRandom` to simulate
- * intermittent failures. This is an effective way to test and demonstrate the resilience patterns
- * in action. 7. Integration with Tracing: The methods are also annotated with `@TraceMethod` and
- * `@BusinessOperation`, ensuring that these simulated external calls are fully integrated into the
- * distributed trace.
- *
- * <p>Role in the Architecture: ------------------------- - It represents the "service layer" or
- * "integration layer" of the application. - It encapsulates the logic for communicating with
- * external dependencies. - It is the primary location for implementing fault tolerance and
- * resilience policies.
- *
- * <p>Overall Feedback: ----------------- - This is an outstanding class that serves as a practical,
- * hands-on guide to implementing comprehensive resilience with Resilience4j. - The combination of
- * multiple patterns on single methods (e.g., `@CircuitBreaker`, `@Retry`, and `@RateLimiter` on
- * `callLambdaService`) is a powerful demonstration of how these patterns can be composed. - The
- * code is clean, well-commented, and the simulations are realistic enough to be highly instructive.
- *
- * <p>Weaknesses/Areas for Improvement: --------------------------------- - The use of Spring's
- * `@Cacheable` instead of Resilience4j's `@Cache` is a pragmatic choice, as Spring Cache is more
- * commonly used and integrated. However, it's worth noting that it's not a "pure" Resilience4j
- * implementation in that one aspect. This is a minor point and a perfectly valid architectural
- * decision. - The `maskSensitiveQuery` method is a good thought for a POC, but as the comment
- * notes, a production system would require a much more robust and secure data masking/sanitization
- * library.
- *
- * <p>This class is the highlight of the POC, brilliantly demonstrating how to build a robust,
- * fault-tolerant application that can withstand the failures of its dependencies.
- * =================================================================================================
+ * Simulates downstream calls and demonstrates Resilience4j patterns (CB, Retry,
+ * RateLimiter, Bulkhead, TimeLimiter) with fallbacks. Each method is trace-annotated
+ * to enrich spans with business context. Comments trimmed for clarity.
  */
 @Service
 public class ExternalServiceClient {
@@ -78,15 +27,7 @@ public class ExternalServiceClient {
 
   private static final Logger logger = LoggerFactory.getLogger(ExternalServiceClient.class);
 
-  /**
-   * Simulates AWS Lambda service call with Circuit Breaker, Retry, and Rate Limiter.
-   *
-   * <p>Circuit Breaker: Opens when failure rate exceeds 60% in the last 10 calls Retry: Retries up
-   * to 4 times with exponential backoff starting at 500ms Rate Limiter: Allows max 15 calls per
-   * second with 100ms wait time
-   *
-   * <p>This represents Layer 2 in the distributed architecture (Lambda microservice).
-   */
+  /** Simulated Lambda call guarded by CB + Retry + RateLimiter; occasionally fails. */
   @CircuitBreaker(name = "lambdaService", fallbackMethod = "fallbackLambdaCall")
   @Retry(name = "lambdaService")
   @RateLimiter(name = "lambdaService")
@@ -121,10 +62,7 @@ public class ExternalServiceClient {
         .build();
   }
 
-  /**
-   * Fallback method for Lambda service failures. Provides graceful degradation when Lambda service
-   * is unavailable.
-   */
+  /** Fallback for Lambda failures; returns a structured FALLBACK result. */
   public ProcessingResult fallbackLambdaCall(String userId, String data, Exception ex) {
     logger.warn(
         "Lambda service fallback triggered for user: {} - Reason: {}", userId, ex.getMessage());
@@ -147,15 +85,7 @@ public class ExternalServiceClient {
         .build();
   }
 
-  /**
-   * Simulates EKS microservice call with Bulkhead, Circuit Breaker, and Retry.
-   *
-   * <p>Bulkhead: Limits concurrent executions to 3 (semaphore-based isolation) Circuit Breaker:
-   * Opens when failure rate exceeds 40% in the last 8 calls Retry: Retries up to 3 times with 2s
-   * initial delay and exponential backoff
-   *
-   * <p>This represents Layer 3 in the distributed architecture (EKS microservice).
-   */
+  /** Simulated EKS call with semaphore bulkhead + CB + Retry; sometimes fails. */
   @Bulkhead(name = "eksService", type = Bulkhead.Type.SEMAPHORE, fallbackMethod = "fallbackEksCall")
   @CircuitBreaker(name = "eksService")
   @Retry(name = "eksService")
@@ -194,7 +124,7 @@ public class ExternalServiceClient {
         .build();
   }
 
-  /** Fallback method for EKS service failures. */
+  /** Fallback for EKS failures. */
   public ProcessingResult fallbackEksCall(String transactionId, String payload, Exception ex) {
     logger.warn(
         "EKS service fallback triggered for transaction: {} - Reason: {}",
@@ -213,15 +143,7 @@ public class ExternalServiceClient {
         .build();
   }
 
-  /**
-   * Simulates database operation with Time Limiter, Circuit Breaker, and Retry.
-   *
-   * <p>Time Limiter: Prevents operations from hanging beyond 5 seconds Circuit Breaker: Opens when
-   * failure rate exceeds 30% in the last 12 calls Retry: Retries up to 2 times with 3s initial
-   * delay
-   *
-   * <p>Uses CompletableFuture for async operations with time limits.
-   */
+  /** Async DB operation with TimeLimiter + CB + Retry; returns completed future. */
   @TimeLimiter(name = "databaseService")
   @CircuitBreaker(name = "databaseService", fallbackMethod = "fallbackDatabaseCall")
   @Bulkhead(name = "databaseService", type = Bulkhead.Type.THREADPOOL)
@@ -267,7 +189,7 @@ public class ExternalServiceClient {
     return CompletableFuture.completedFuture(result);
   }
 
-  /** Fallback method for database operation failures. */
+  /** Fallback for database operation failures. */
   public CompletableFuture<ProcessingResult> fallbackDatabaseCall(String query, Exception ex) {
     logger.warn(
         "Database operation fallback triggered for query: {} - Reason: {}",
@@ -288,14 +210,7 @@ public class ExternalServiceClient {
             .build());
   }
 
-  /**
-   * Demonstrates Cache pattern - caches results to improve performance.
-   *
-   * <p>Cache: Results cached for 5 minutes (300s) with max 1000 entries Rate Limiter: Allows max 20
-   * calls per second with 500ms wait time
-   *
-   * <p>Cache key is automatically based on method parameters.
-   */
+  /** Cached user data fetch (also rate limited); simulates an expensive read. */
   @Cacheable(value = "userDataCache")
   @RateLimiter(name = "userService")
   @TraceMethod(operationName = "user-data-fetch", includeReturnValue = true)
@@ -324,12 +239,7 @@ public class ExternalServiceClient {
         .build();
   }
 
-  /**
-   * Complex example combining multiple Resilience4j patterns: Rate Limiter + Circuit Breaker +
-   * Thread Pool Bulkhead + Cache
-   *
-   * <p>This demonstrates how multiple patterns work together for comprehensive resilience.
-   */
+  /** Combined example using RL + CB + thread-pool bulkhead + cache. */
   @RateLimiter(name = "combinedService")
   @CircuitBreaker(name = "combinedService", fallbackMethod = "fallbackCombinedCall")
   @Bulkhead(name = "combinedService", type = Bulkhead.Type.THREADPOOL)
@@ -370,7 +280,7 @@ public class ExternalServiceClient {
         .build();
   }
 
-  /** Fallback method for complex business operation. */
+  /** Fallback for complex business operation. */
   public ProcessingResult fallbackCombinedCall(
       String operationId, String parameters, Exception ex) {
     logger.warn(
@@ -391,10 +301,7 @@ public class ExternalServiceClient {
         .build();
   }
 
-  /**
-   * Heavy processing service demonstrating Thread Pool Bulkhead isolation. Uses separate thread
-   * pool to prevent resource exhaustion.
-   */
+  /** Heavy processing offloaded to a thread-pool bulkhead. */
   @Bulkhead(name = "heavyProcessingService", type = Bulkhead.Type.THREADPOOL)
   @TimeLimiter(name = "combinedService")
   @TraceMethod(operationName = "heavy-processing")
