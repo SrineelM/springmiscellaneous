@@ -171,6 +171,20 @@ resilience4j:
         failure-rate-threshold: 45
         sliding-window-size: 15
         wait-duration-in-open-state: 8s
+      basicCircuitBreaker:
+        base-config: default
+        failure-rate-threshold: 50
+        sliding-window-size: 10
+        wait-duration-in-open-state: 10s
+      multiTypeCB:
+        base-config: default
+        failure-rate-threshold: 40
+      combinedPattern:
+        base-config: default
+        failure-rate-threshold: 45
+      maxResilience:
+        base-config: default
+        failure-rate-threshold: 30
 
   # Retry Configuration - Automatic retry with exponential backoff
   retry:
@@ -206,6 +220,20 @@ resilience4j:
         base-config: default
         max-attempts: 3
         wait-duration: 1s
+      basicRetry:
+        base-config: default
+        max-attempts: 3
+        wait-duration: 1s
+        exponential-backoff-multiplier: 2
+      selectiveRetry:
+        base-config: default
+        max-attempts: 2
+      combinedPattern:
+        base-config: default
+        max-attempts: 3
+      maxResilience:
+        base-config: default
+        max-attempts: 2
 
   # Rate Limiter Configuration - Controls request rate
   ratelimiter:
@@ -232,6 +260,20 @@ resilience4j:
         base-config: default
         limit-for-period: 5
         timeout-duration: 0s
+      basicRateLimiter:
+        base-config: default
+        limit-for-period: 10
+        timeout-duration: 0s
+      waitingRateLimiter:
+        base-config: default
+        limit-for-period: 10
+        timeout-duration: 500ms
+      combinedPattern:
+        base-config: default
+        limit-for-period: 8
+      maxResilience:
+        base-config: default
+        limit-for-period: 5
 
   # Bulkhead Configuration - Isolates resources (Semaphore-based)
   bulkhead:
@@ -253,6 +295,13 @@ resilience4j:
         base-config: default
         max-concurrent-calls: 2
         max-wait-duration: 1s
+      semaphoreBulkhead:
+        base-config: default
+        max-concurrent-calls: 3
+        max-wait-duration: 1s
+      maxResilience:
+        base-config: default
+        max-concurrent-calls: 2
 
   # Thread Pool Bulkhead Configuration - Isolates thread pools
   thread-pool-bulkhead:
@@ -274,6 +323,16 @@ resilience4j:
         max-thread-pool-size: 8
         core-thread-pool-size: 4
         queue-capacity: 20
+      threadPoolBulkhead:
+        base-config: default
+        max-thread-pool-size: 4
+        core-thread-pool-size: 2
+        queue-capacity: 10
+      maxResilience:
+        base-config: default
+        max-thread-pool-size: 6
+        core-thread-pool-size: 3
+        queue-capacity: 15
 
   # Time Limiter Configuration - Prevents hanging operations
   timelimiter:
@@ -296,6 +355,12 @@ resilience4j:
       combinedService:
         base-config: default
         timeout-duration: 6s
+      basicTimeLimiter:
+        base-config: default
+        timeout-duration: 3s
+      maxResilience:
+        base-config: default
+        timeout-duration: 5s
 
   # Cache Configuration (Resilience4j Cache pattern)
   cache:
@@ -309,6 +374,10 @@ resilience4j:
         event-consumer-buffer-size: 100
       combinedCache:
         event-consumer-buffer-size: 75
+      demoCache:
+        event-consumer-buffer-size: 100
+      maxResilienceCache:
+        event-consumer-buffer-size: 100
 
   # Metrics Configuration for monitoring
   metrics:
