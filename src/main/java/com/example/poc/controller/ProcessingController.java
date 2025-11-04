@@ -17,9 +17,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * REST controller that orchestrates the demo processing flow.
- * Uses business annotations to enrich traces and returns structured
- * {@link com.example.poc.model.ProcessingResult} responses. Comments trimmed for brevity.
+ * REST controller that orchestrates the demo processing flow. Uses business annotations to enrich
+ * traces and returns structured {@link com.example.poc.model.ProcessingResult} responses. Comments
+ * trimmed for brevity.
  */
 @RestController
 @RequestMapping("/api/v1/processing")

@@ -16,15 +16,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Utility class for distributed tracing operations. Provides helper methods for:
- * - Creating and managing spans programmatically
- * - Extracting trace context
- * - Working with baggage
- * - Async tracing patterns
- * - Error handling in traced operations
+ * Utility class for distributed tracing operations. Provides helper methods for: - Creating and
+ * managing spans programmatically - Extracting trace context - Working with baggage - Async tracing
+ * patterns - Error handling in traced operations
  *
- * <p>This class complements the declarative AOP approach with programmatic tracing capabilities
- * for scenarios where annotations aren't suitable (dynamic spans, conditional tracing, etc.)
+ * <p>This class complements the declarative AOP approach with programmatic tracing capabilities for
+ * scenarios where annotations aren't suitable (dynamic spans, conditional tracing, etc.)
  */
 public class TracingUtils {
   private static final Logger logger = LoggerFactory.getLogger(TracingUtils.class);
@@ -158,10 +155,7 @@ public class TracingUtils {
    * @throws Exception if the operation throws
    */
   public static <T> T withConfiguredSpan(
-      Tracer tracer,
-      String spanName,
-      Consumer<SpanBuilder> configurator,
-      Supplier<T> operation)
+      Tracer tracer, String spanName, Consumer<SpanBuilder> configurator, Supplier<T> operation)
       throws Exception {
     SpanBuilder spanBuilder = tracer.spanBuilder(spanName);
     configurator.accept(spanBuilder);

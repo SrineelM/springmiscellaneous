@@ -6,8 +6,8 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Describes a business operation for tracing: name, category, sensitivity and
- * importance. Used by the aspect to add business attributes to spans.
+ * Describes a business operation for tracing: name, category, sensitivity and importance. Used by
+ * the aspect to add business attributes to spans.
  */
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)

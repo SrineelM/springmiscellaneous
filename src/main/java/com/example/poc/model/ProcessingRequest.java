@@ -1,8 +1,8 @@
 package com.example.poc.model;
 
 /**
- * Request DTO for the processing flow. Kept Jackson-friendly with a
- * default constructor and simple getters/setters.
+ * Request DTO for the processing flow. Kept Jackson-friendly with a default constructor and simple
+ * getters/setters.
  */
 public class ProcessingRequest {
 

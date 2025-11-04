@@ -18,16 +18,15 @@ import org.springframework.http.client.ClientHttpRequestInterceptor;
 import org.springframework.http.client.ClientHttpResponse;
 
 /**
- * RestTemplate interceptor that automatically creates CLIENT spans and propagates trace context
- * via HTTP headers for outgoing HTTP requests.
+ * RestTemplate interceptor that automatically creates CLIENT spans and propagates trace context via
+ * HTTP headers for outgoing HTTP requests.
  *
- * <p>This interceptor:
- * - Creates a CLIENT span for each HTTP request
- * - Adds HTTP semantic attributes (method, URL, status code, etc.)
- * - Propagates W3C trace context headers
- * - Records exceptions and sets appropriate span status
+ * <p>This interceptor: - Creates a CLIENT span for each HTTP request - Adds HTTP semantic
+ * attributes (method, URL, status code, etc.) - Propagates W3C trace context headers - Records
+ * exceptions and sets appropriate span status
  *
  * <p>Usage:
+ *
  * <pre>{@code
  * @Bean
  * public RestTemplate restTemplate(TracingRestTemplateInterceptor interceptor) {
@@ -142,9 +141,7 @@ public class TracingRestTemplateInterceptor implements ClientHttpRequestIntercep
     return "HTTP " + method + " " + path;
   }
 
-  /**
-   * TextMapSetter for injecting trace context into HTTP request headers.
-   */
+  /** TextMapSetter for injecting trace context into HTTP request headers. */
   private static final TextMapSetter<HttpRequest> HTTP_HEADER_SETTER =
       (carrier, key, value) -> {
         if (carrier != null && key != null && value != null) {

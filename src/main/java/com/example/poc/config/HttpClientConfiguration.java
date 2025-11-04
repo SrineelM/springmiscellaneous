@@ -11,10 +11,8 @@ import org.springframework.web.client.RestTemplate;
 /**
  * Configuration for HTTP clients with automatic distributed tracing.
  *
- * <p>This configuration demonstrates:
- * - RestTemplate with automatic OpenTelemetry tracing
- * - HTTP request/response tracing with W3C context propagation
- * - CLIENT span creation for outbound calls
+ * <p>This configuration demonstrates: - RestTemplate with automatic OpenTelemetry tracing - HTTP
+ * request/response tracing with W3C context propagation - CLIENT span creation for outbound calls
  */
 @Configuration
 public class HttpClientConfiguration {
@@ -23,11 +21,8 @@ public class HttpClientConfiguration {
    * Creates a RestTemplate with tracing interceptor for automatic context propagation.
    *
    * <p>This bean demonstrates the PROGRAMMATIC approach to distributed tracing for HTTP clients.
-   * The interceptor automatically:
-   * - Creates CLIENT spans for each request
-   * - Propagates W3C trace context headers
-   * - Adds HTTP semantic attributes
-   * - Records exceptions and response status
+   * The interceptor automatically: - Creates CLIENT spans for each request - Propagates W3C trace
+   * context headers - Adds HTTP semantic attributes - Records exceptions and response status
    *
    * @param tracer OpenTelemetry tracer
    * @param openTelemetry OpenTelemetry instance for context propagation
@@ -38,16 +33,14 @@ public class HttpClientConfiguration {
     TracingRestTemplateInterceptor interceptor =
         new TracingRestTemplateInterceptor(tracer, openTelemetry);
 
-    return new RestTemplateBuilder()
-        .additionalInterceptors(interceptor)
-        .build();
+    return new RestTemplateBuilder().additionalInterceptors(interceptor).build();
   }
 
   /**
    * Optional: Create a non-traced RestTemplate for scenarios where tracing is not desired.
    *
-   * <p>Use this when you want to make HTTP calls without creating spans
-   * (e.g., health checks, internal communication that shouldn't be traced).
+   * <p>Use this when you want to make HTTP calls without creating spans (e.g., health checks,
+   * internal communication that shouldn't be traced).
    */
   @Bean
   public RestTemplate plainRestTemplate() {

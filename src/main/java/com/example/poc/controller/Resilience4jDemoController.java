@@ -13,14 +13,11 @@ import org.springframework.web.bind.annotation.*;
 /**
  * REST controller demonstrating all Resilience4j patterns and annotations.
  *
- * <p>This controller provides endpoints to test and demonstrate:
- * - Circuit Breaker (with different states and fallbacks)
- * - Retry (with exponential backoff and selective retry)
- * - Rate Limiter (with and without waiting)
- * - Bulkhead (both Semaphore and Thread Pool types)
- * - Time Limiter (for async operations)
- * - Cache (Cacheable, CachePut, CacheEvict)
- * - Combined patterns (multiple annotations on single method)
+ * <p>This controller provides endpoints to test and demonstrate: - Circuit Breaker (with different
+ * states and fallbacks) - Retry (with exponential backoff and selective retry) - Rate Limiter (with
+ * and without waiting) - Bulkhead (both Semaphore and Thread Pool types) - Time Limiter (for async
+ * operations) - Cache (Cacheable, CachePut, CacheEvict) - Combined patterns (multiple annotations
+ * on single method)
  *
  * <p>Each endpoint includes comprehensive logging and trace context propagation.
  */
@@ -42,9 +39,8 @@ public class Resilience4jDemoController {
   /**
    * Test basic circuit breaker.
    *
-   * <p>Usage:
-   * - GET /api/v1/resilience4j/circuit-breaker?shouldFail=false (Success)
-   * - GET /api/v1/resilience4j/circuit-breaker?shouldFail=true (Triggers fallback)
+   * <p>Usage: - GET /api/v1/resilience4j/circuit-breaker?shouldFail=false (Success) - GET
+   * /api/v1/resilience4j/circuit-breaker?shouldFail=true (Triggers fallback)
    *
    * <p>Send multiple failures to open the circuit, then observe the OPEN state behavior.
    */
@@ -66,10 +62,9 @@ public class Resilience4jDemoController {
   /**
    * Test circuit breaker with multiple fallback methods.
    *
-   * <p>Usage:
-   * - GET /api/v1/resilience4j/circuit-breaker-multi?exceptionType=runtime
-   * - GET /api/v1/resilience4j/circuit-breaker-multi?exceptionType=illegal
-   * - GET /api/v1/resilience4j/circuit-breaker-multi?exceptionType=none
+   * <p>Usage: - GET /api/v1/resilience4j/circuit-breaker-multi?exceptionType=runtime - GET
+   * /api/v1/resilience4j/circuit-breaker-multi?exceptionType=illegal - GET
+   * /api/v1/resilience4j/circuit-breaker-multi?exceptionType=none
    */
   @GetMapping("/circuit-breaker-multi")
   public ResponseEntity<ProcessingResult> testCircuitBreakerMultiFallback(
@@ -93,10 +88,9 @@ public class Resilience4jDemoController {
   /**
    * Test basic retry with exponential backoff.
    *
-   * <p>Usage:
-   * - GET /api/v1/resilience4j/retry?attemptToFail=0 (Success on first attempt)
-   * - GET /api/v1/resilience4j/retry?attemptToFail=2 (Success after 2 retries)
-   * - GET /api/v1/resilience4j/retry?attemptToFail=5 (Exhausts all retries, triggers fallback)
+   * <p>Usage: - GET /api/v1/resilience4j/retry?attemptToFail=0 (Success on first attempt) - GET
+   * /api/v1/resilience4j/retry?attemptToFail=2 (Success after 2 retries) - GET
+   * /api/v1/resilience4j/retry?attemptToFail=5 (Exhausts all retries, triggers fallback)
    */
   @GetMapping("/retry")
   public ResponseEntity<ProcessingResult> testRetry(
@@ -108,18 +102,16 @@ public class Resilience4jDemoController {
       return ResponseEntity.ok(buildSuccessResult("retry", result));
     } catch (Exception e) {
       logger.error("Retry test failed", e);
-      return ResponseEntity.internalServerError()
-          .body(buildErrorResult("retry", e.getMessage()));
+      return ResponseEntity.internalServerError().body(buildErrorResult("retry", e.getMessage()));
     }
   }
 
   /**
    * Test selective retry (some exceptions retried, others not).
    *
-   * <p>Usage:
-   * - GET /api/v1/resilience4j/retry-selective?exceptionType=retry (Retries)
-   * - GET /api/v1/resilience4j/retry-selective?exceptionType=ignore (No retry)
-   * - GET /api/v1/resilience4j/retry-selective?exceptionType=none (Success)
+   * <p>Usage: - GET /api/v1/resilience4j/retry-selective?exceptionType=retry (Retries) - GET
+   * /api/v1/resilience4j/retry-selective?exceptionType=ignore (No retry) - GET
+   * /api/v1/resilience4j/retry-selective?exceptionType=none (Success)
    */
   @GetMapping("/retry-selective")
   public ResponseEntity<ProcessingResult> testSelectiveRetry(
@@ -143,8 +135,8 @@ public class Resilience4jDemoController {
   /**
    * Test basic rate limiter (fails immediately when limit exceeded).
    *
-   * <p>Usage: Send 15+ requests within 1 second to trigger rate limiting
-   * - curl http://localhost:8080/api/v1/resilience4j/rate-limiter?requestId=req-{1..20}
+   * <p>Usage: Send 15+ requests within 1 second to trigger rate limiting - curl
+   * http://localhost:8080/api/v1/resilience4j/rate-limiter?requestId=req-{1..20}
    */
   @GetMapping("/rate-limiter")
   public ResponseEntity<ProcessingResult> testRateLimiter(
@@ -233,8 +225,7 @@ public class Resilience4jDemoController {
   /**
    * Test time limiter.
    *
-   * <p>Usage:
-   * - GET /api/v1/resilience4j/time-limiter?processingTimeMs=1000 (Success, under limit)
+   * <p>Usage: - GET /api/v1/resilience4j/time-limiter?processingTimeMs=1000 (Success, under limit)
    * - GET /api/v1/resilience4j/time-limiter?processingTimeMs=5000 (Timeout, triggers fallback)
    */
   @GetMapping("/time-limiter")
@@ -277,9 +268,7 @@ public class Resilience4jDemoController {
     return ResponseEntity.ok(response);
   }
 
-  /**
-   * Test cache put (updates cache).
-   */
+  /** Test cache put (updates cache). */
   @PutMapping("/cache/{userId}")
   public ResponseEntity<ProcessingResult> testCachePut(
       @PathVariable String userId, @RequestParam String newData) {
@@ -289,20 +278,17 @@ public class Resilience4jDemoController {
     return ResponseEntity.ok(buildSuccessResult("cache-put", result));
   }
 
-  /**
-   * Test cache evict (removes specific entry).
-   */
+  /** Test cache evict (removes specific entry). */
   @DeleteMapping("/cache/{userId}")
   public ResponseEntity<ProcessingResult> testCacheEvict(@PathVariable String userId) {
     logger.info("Testing cache evict for user: {}", userId);
 
     demoService.cacheEvictDemo(userId);
-    return ResponseEntity.ok(buildSuccessResult("cache-evict", "Cache evicted for user: " + userId));
+    return ResponseEntity.ok(
+        buildSuccessResult("cache-evict", "Cache evicted for user: " + userId));
   }
 
-  /**
-   * Test cache evict all.
-   */
+  /** Test cache evict all. */
   @DeleteMapping("/cache")
   public ResponseEntity<ProcessingResult> testCacheEvictAll() {
     logger.info("Testing cache evict all");
@@ -351,8 +337,7 @@ public class Resilience4jDemoController {
       return ResponseEntity.ok(buildSuccessResult("combined-max", result));
     } catch (Exception e) {
       logger.error("Maximum resilience test failed", e);
-      return ResponseEntity.status(503)
-          .body(buildErrorResult("combined-max", e.getMessage()));
+      return ResponseEntity.status(503).body(buildErrorResult("combined-max", e.getMessage()));
     }
   }
 
@@ -360,9 +345,7 @@ public class Resilience4jDemoController {
   // INFO ENDPOINT
   // ========================================================================================
 
-  /**
-   * Get information about all available resilience patterns and endpoints.
-   */
+  /** Get information about all available resilience patterns and endpoints. */
   @GetMapping("/info")
   public ResponseEntity<ProcessingResult> getResilienceInfo() {
     logger.info("Retrieving resilience4j demo information");

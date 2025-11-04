@@ -16,9 +16,9 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 /**
- * Simulates downstream calls and demonstrates Resilience4j patterns (CB, Retry,
- * RateLimiter, Bulkhead, TimeLimiter) with fallbacks. Each method is trace-annotated
- * to enrich spans with business context. Comments trimmed for clarity.
+ * Simulates downstream calls and demonstrates Resilience4j patterns (CB, Retry, RateLimiter,
+ * Bulkhead, TimeLimiter) with fallbacks. Each method is trace-annotated to enrich spans with
+ * business context. Comments trimmed for clarity.
  */
 @Service
 public class ExternalServiceClient {

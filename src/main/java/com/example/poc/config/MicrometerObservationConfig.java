@@ -6,9 +6,9 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Enables Micrometer's {@code @Observed} AOP. With
- * micrometer-tracing-bridge-otel present, observations are bridged to
- * OpenTelemetry spans so tests can assert on them via the OTel exporter.
+ * Enables Micrometer's {@code @Observed} AOP. With micrometer-tracing-bridge-otel present,
+ * observations are bridged to OpenTelemetry spans so tests can assert on them via the OTel
+ * exporter.
  */
 @Configuration
 public class MicrometerObservationConfig {

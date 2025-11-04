@@ -17,14 +17,11 @@ import org.springframework.stereotype.Service;
 /**
  * Comprehensive demonstration of ALL Resilience4j annotations and configuration options.
  *
- * <p>This service showcases:
- * 1. @CircuitBreaker - All states (CLOSED, OPEN, HALF_OPEN), fallbacks, event listeners
- * 2. @Retry - Exponential backoff, max attempts, exception filtering
- * 3. @RateLimiter - Request throttling, timeout handling
- * 4. @Bulkhead - Both SEMAPHORE and THREADPOOL types
- * 5. @TimeLimiter - Async operation timeouts
- * 6. @Cacheable/@CachePut/@CacheEvict - Caching patterns
- * 7. Pattern combinations - Multiple annotations on single method
+ * <p>This service showcases: 1. @CircuitBreaker - All states (CLOSED, OPEN, HALF_OPEN), fallbacks,
+ * event listeners 2. @Retry - Exponential backoff, max attempts, exception filtering
+ * 3. @RateLimiter - Request throttling, timeout handling 4. @Bulkhead - Both SEMAPHORE and
+ * THREADPOOL types 5. @TimeLimiter - Async operation timeouts 6. @Cacheable/@CachePut/@CacheEvict -
+ * Caching patterns 7. Pattern combinations - Multiple annotations on single method
  *
  * <p>Each method demonstrates different aspects and configurations of the patterns.
  */
@@ -39,10 +36,8 @@ public class Resilience4jDemoService {
   /**
    * Basic Circuit Breaker with fallback.
    *
-   * <p>Configuration in application.yml:
-   * - failure-rate-threshold: 50%
-   * - sliding-window-size: 10 calls
-   * - wait-duration-in-open-state: 10s
+   * <p>Configuration in application.yml: - failure-rate-threshold: 50% - sliding-window-size: 10
+   * calls - wait-duration-in-open-state: 10s
    *
    * <p>States: CLOSED → OPEN (on threshold) → HALF_OPEN → CLOSED/OPEN
    */
@@ -65,10 +60,12 @@ public class Resilience4jDemoService {
    *
    * <p>Demonstrates fallback method selection based on exception type.
    */
-  @CircuitBreaker(name = "multiTypeCB", fallbackMethod = "handleRuntimeException,handleGeneralException")
+  @CircuitBreaker(
+      name = "multiTypeCB",
+      fallbackMethod = "handleRuntimeException,handleGeneralException")
   public String circuitBreakerWithTypedFallbacks(String exceptionType) {
     logger.info("Testing circuit breaker with exception type: {}", exceptionType);
-    
+
     switch (exceptionType) {
       case "runtime":
         throw new RuntimeException("Runtime exception triggered");
@@ -96,21 +93,18 @@ public class Resilience4jDemoService {
   /**
    * Basic Retry with exponential backoff.
    *
-   * <p>Configuration:
-   * - max-attempts: 3
-   * - wait-duration: 1s
-   * - exponential-backoff-multiplier: 2
-   * - Pattern: 1s → 2s → 4s
+   * <p>Configuration: - max-attempts: 3 - wait-duration: 1s - exponential-backoff-multiplier: 2 -
+   * Pattern: 1s → 2s → 4s
    */
   @Retry(name = "basicRetry", fallbackMethod = "retryFallback")
   public String basicRetryDemo(int attemptToFail) {
     int currentAttempt = getCurrentRetryAttempt();
     logger.info("Retry attempt #{}", currentAttempt);
-    
+
     if (currentAttempt <= attemptToFail) {
       throw new RuntimeException("Attempt " + currentAttempt + " failed (will retry)");
     }
-    
+
     return "Success after " + currentAttempt + " attempts";
   }
 
@@ -122,14 +116,13 @@ public class Resilience4jDemoService {
   /**
    * Retry with selective exception handling.
    *
-   * <p>Configuration includes:
-   * - retry-exceptions: Specific exceptions to retry
-   * - ignore-exceptions: Exceptions that shouldn't trigger retry
+   * <p>Configuration includes: - retry-exceptions: Specific exceptions to retry -
+   * ignore-exceptions: Exceptions that shouldn't trigger retry
    */
   @Retry(name = "selectiveRetry")
   public String selectiveRetryDemo(String exceptionType) {
     logger.info("Selective retry with exception: {}", exceptionType);
-    
+
     switch (exceptionType) {
       case "retry":
         // This will be retried (configured in retry-exceptions)
@@ -149,10 +142,8 @@ public class Resilience4jDemoService {
   /**
    * Basic Rate Limiter.
    *
-   * <p>Configuration:
-   * - limit-for-period: 10 requests
-   * - limit-refresh-period: 1 second
-   * - timeout-duration: 0s (fail immediately if limit exceeded)
+   * <p>Configuration: - limit-for-period: 10 requests - limit-refresh-period: 1 second -
+   * timeout-duration: 0s (fail immediately if limit exceeded)
    */
   @RateLimiter(name = "basicRateLimiter", fallbackMethod = "rateLimiterFallback")
   public String basicRateLimiterDemo(String requestId) {
@@ -184,13 +175,14 @@ public class Resilience4jDemoService {
   /**
    * Semaphore-based Bulkhead.
    *
-   * <p>Configuration:
-   * - max-concurrent-calls: 3
-   * - max-wait-duration: 1s
+   * <p>Configuration: - max-concurrent-calls: 3 - max-wait-duration: 1s
    *
    * <p>Limits concurrent executions using semaphore (doesn't use separate thread pool).
    */
-  @Bulkhead(name = "semaphoreBulkhead", type = Bulkhead.Type.SEMAPHORE, fallbackMethod = "bulkheadFallback")
+  @Bulkhead(
+      name = "semaphoreBulkhead",
+      type = Bulkhead.Type.SEMAPHORE,
+      fallbackMethod = "bulkheadFallback")
   public String semaphoreBulkheadDemo(String taskId) {
     logger.info("Executing task in semaphore bulkhead: {}", taskId);
     simulateProcessing(2000); // 2 seconds
@@ -205,14 +197,14 @@ public class Resilience4jDemoService {
   /**
    * Thread Pool Bulkhead (for async operations).
    *
-   * <p>Configuration:
-   * - max-thread-pool-size: 4
-   * - core-thread-pool-size: 2
-   * - queue-capacity: 10
+   * <p>Configuration: - max-thread-pool-size: 4 - core-thread-pool-size: 2 - queue-capacity: 10
    *
    * <p>Uses separate thread pool for isolation.
    */
-  @Bulkhead(name = "threadPoolBulkhead", type = Bulkhead.Type.THREADPOOL, fallbackMethod = "threadPoolBulkheadFallback")
+  @Bulkhead(
+      name = "threadPoolBulkhead",
+      type = Bulkhead.Type.THREADPOOL,
+      fallbackMethod = "threadPoolBulkheadFallback")
   public CompletableFuture<String> threadPoolBulkheadDemo(String taskId) {
     logger.info("Executing task in thread pool bulkhead: {}", taskId);
     simulateProcessing(1000);
@@ -232,9 +224,7 @@ public class Resilience4jDemoService {
   /**
    * Time Limiter for async operations.
    *
-   * <p>Configuration:
-   * - timeout-duration: 3s
-   * - cancel-running-future: true
+   * <p>Configuration: - timeout-duration: 3s - cancel-running-future: true
    *
    * <p>Cancels operation if it exceeds timeout.
    */
@@ -258,9 +248,7 @@ public class Resilience4jDemoService {
   /**
    * Basic cache - stores result for future calls.
    *
-   * <p>Configuration:
-   * - expire-after-write: 300s (5 minutes)
-   * - maximum-size: 1000
+   * <p>Configuration: - expire-after-write: 300s (5 minutes) - maximum-size: 1000
    */
   @Cacheable(value = "demoCache", key = "#userId")
   public String cacheableDemo(String userId) {
@@ -269,26 +257,20 @@ public class Resilience4jDemoService {
     return "User data for " + userId + " (fetched at " + System.currentTimeMillis() + ")";
   }
 
-  /**
-   * Cache Put - updates cache after execution.
-   */
+  /** Cache Put - updates cache after execution. */
   @CachePut(value = "demoCache", key = "#userId")
   public String cachePutDemo(String userId, String newData) {
     logger.info("Updating cache for user: {}", userId);
     return "Updated data for " + userId + ": " + newData;
   }
 
-  /**
-   * Cache Evict - removes entries from cache.
-   */
+  /** Cache Evict - removes entries from cache. */
   @CacheEvict(value = "demoCache", key = "#userId")
   public void cacheEvictDemo(String userId) {
     logger.info("Evicting cache for user: {}", userId);
   }
 
-  /**
-   * Cache Evict All - clears entire cache.
-   */
+  /** Cache Evict All - clears entire cache. */
   @CacheEvict(value = "demoCache", allEntries = true)
   public void cacheEvictAllDemo() {
     logger.info("Evicting all cache entries");
@@ -301,10 +283,8 @@ public class Resilience4jDemoService {
   /**
    * Combination: Circuit Breaker + Retry + Rate Limiter.
    *
-   * <p>Order of execution (outside-in):
-   * 1. RateLimiter - Check if request is allowed
-   * 2. CircuitBreaker - Check circuit state
-   * 3. Retry - Execute with retry logic
+   * <p>Order of execution (outside-in): 1. RateLimiter - Check if request is allowed 2.
+   * CircuitBreaker - Check circuit state 3. Retry - Execute with retry logic
    *
    * <p>This is the most common production pattern for external service calls.
    */
@@ -313,12 +293,12 @@ public class Resilience4jDemoService {
   @Retry(name = "combinedPattern")
   public String triplePatternDemo(String operationId) {
     logger.info("Executing triple pattern demo: {}", operationId);
-    
+
     // Simulate occasional failures
     if (ThreadLocalRandom.current().nextDouble() < 0.3) {
       throw new RuntimeException("Random failure in triple pattern");
     }
-    
+
     return "Triple pattern success: " + operationId;
   }
 
@@ -330,13 +310,9 @@ public class Resilience4jDemoService {
   /**
    * Combination: All patterns together (maximum resilience).
    *
-   * <p>Demonstrates:
-   * - RateLimiter: Prevent overload
-   * - CircuitBreaker: Fast fail when service is down
-   * - Retry: Handle transient failures
-   * - TimeLimiter: Prevent hanging
-   * - Bulkhead: Isolate resources
-   * - Cache: Reduce load on downstream
+   * <p>Demonstrates: - RateLimiter: Prevent overload - CircuitBreaker: Fast fail when service is
+   * down - Retry: Handle transient failures - TimeLimiter: Prevent hanging - Bulkhead: Isolate
+   * resources - Cache: Reduce load on downstream
    */
   @RateLimiter(name = "maxResilience")
   @CircuitBreaker(name = "maxResilience", fallbackMethod = "maxResilienceFallback")
@@ -346,21 +322,23 @@ public class Resilience4jDemoService {
   @Cacheable(value = "maxResilienceCache", key = "#operationId")
   public CompletableFuture<String> maximumResilienceDemo(String operationId) {
     logger.info("Executing maximum resilience demo: {}", operationId);
-    
+
     simulateProcessing(500);
-    
+
     // Simulate occasional failures
     if (ThreadLocalRandom.current().nextDouble() < 0.2) {
       throw new RuntimeException("Random failure in max resilience pattern");
     }
-    
-    String result = "Maximum resilience success: " + operationId + " at " + System.currentTimeMillis();
+
+    String result =
+        "Maximum resilience success: " + operationId + " at " + System.currentTimeMillis();
     return CompletableFuture.completedFuture(result);
   }
 
   private CompletableFuture<String> maxResilienceFallback(String operationId, Throwable t) {
     logger.warn("Maximum resilience fallback for operation: {}", operationId);
-    return CompletableFuture.completedFuture("Max resilience fallback: Using cached/default response");
+    return CompletableFuture.completedFuture(
+        "Max resilience fallback: Using cached/default response");
   }
 
   // ========================================================================================

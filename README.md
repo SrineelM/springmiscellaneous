@@ -776,27 +776,131 @@ For questions about this POC:
 
 ---
 
-## 🧭 OpenTelemetry vs. Micrometer Tracing (Opinion)
+## 🧭 OpenTelemetry vs. Micrometer Tracing: Comprehensive Guide
 
-This POC favors a custom OpenTelemetry (OTel) SDK configuration for maximum control over span processors, exporters, samplers, and resource attributes.
+### **Why Both Are Included in This POC**
 
-- Why OTel here: vendor-neutral, highly customizable, and ideal for encoding rich business semantics into spans while precisely controlling export pipelines.
-- When to prefer Micrometer Tracing: if you want property-driven Spring autoconfiguration with minimal custom code and strong alignment to the Micrometer ecosystem.
+This POC demonstrates **both OpenTelemetry and Micrometer** working together to show:
+1. **When to use each approach** (declarative vs programmatic)
+2. **How they complement each other** in real-world scenarios
+3. **When they can coexist** and when to choose one
 
-Both work well together. If you standardize on Micrometer, consider removing the custom OTel SDK beans and drive configuration via `management.tracing.*` properties.
+### **🎯 Decision Matrix: When to Use What**
 
-## Micrometer Tracing demo (NEW)
+| Scenario | Recommended Approach | Reason |
+|----------|---------------------|---------|
+| **Standard Spring Boot observability** | Micrometer | Property-driven, autoconfigured, minimal code |
+| **Custom span manipulation** | OpenTelemetry | Fine-grained control over span lifecycle |
+| **Cross-service baggage** | OpenTelemetry | Direct baggage API, custom propagators |
+| **Metrics + Tracing together** | Micrometer | Single abstraction for both |
+| **AWS X-Ray integration** | OpenTelemetry | Native OTLP support, custom resource attributes |
+| **Simple method instrumentation** | Micrometer | `@Observed` annotation, low code overhead |
+| **Complex async workflows** | OpenTelemetry | Context propagation utilities |
+| **Multi-backend export** | OpenTelemetry | Custom span processors, flexible exporters |
+| **Production standard setup** | Micrometer | Spring autoconfiguration, battle-tested |
+| **Advanced tracing patterns** | Hybrid | Micrometer for high-level, OTel for details |
+
+### **🔄 How They Work Together**
+
+```
+┌─────────────────────────────────────────────────────┐
+│           Application Code                          │
+├─────────────────────────────────────────────────────┤
+│                                                     │
+│  Micrometer @Observed  ──┐    ┌── OpenTelemetry    │
+│  (Declarative)           │    │   (Programmatic)   │
+│                          ▼    ▼                     │
+│              Micrometer Tracing Bridge              │
+│                          │                          │
+│                          ▼                          │
+│              OpenTelemetry SDK                      │
+│                          │                          │
+│                          ▼                          │
+│              OTLP Exporter / X-Ray / Jaeger        │
+└─────────────────────────────────────────────────────┘
+```
+
+The `micrometer-tracing-bridge-otel` allows Micrometer observations to create OpenTelemetry spans seamlessly.
+
+### **📊 Comparison Table**
+
+| Feature | OpenTelemetry (Programmatic) | Micrometer (Declarative) |
+|---------|------------------------------|--------------------------|
+| **Setup Complexity** | High (custom SDK beans) | Low (Spring autoconfigure) |
+| **Code Intrusion** | Medium (manual span calls) | Minimal (@Observed) |
+| **Fine-grained Control** | ✅ Full control | ⚠️ Limited |
+| **Async Support** | ✅ Excellent | ⚠️ Basic |
+| **Custom Attributes** | ✅ Rich API | ⚠️ Via tags only |
+| **Baggage Propagation** | ✅ Direct API | ⚠️ Via config |
+| **Spring Integration** | ⚠️ Manual | ✅ Native |
+| **Metrics Support** | ❌ Tracing only | ✅ Metrics + Tracing |
+| **Learning Curve** | Steep | Gentle |
+| **Production Ready** | ✅ (with expertise) | ✅ (out of box) |
+
+### **🚀 Dual Tracing Demo Endpoints**
+
+This POC includes a comprehensive dual tracing demonstration. Access it via:
+
+#### **Programmatic OpenTelemetry Examples**
+```bash
+# Manual span creation
+curl http://localhost:8080/api/v1/tracing/otel/programmatic?operation=data-processing
+
+# Nested spans (parent/child relationships)
+curl http://localhost:8080/api/v1/tracing/otel/nested?workflowId=wf-123
+
+# CLIENT span for HTTP calls
+curl http://localhost:8080/api/v1/tracing/otel/client?serviceUrl=https://api.example.com
+
+# Async tracing with context propagation
+curl http://localhost:8080/api/v1/tracing/otel/async?taskId=task-123
+
+# Custom span builder with fluent API
+curl http://localhost:8080/api/v1/tracing/otel/custom?operationId=op-123
+
+# Baggage propagation
+curl "http://localhost:8080/api/v1/tracing/otel/baggage?userId=user123&tenantId=tenant456"
+```
+
+#### **Declarative Micrometer Examples**
+```bash
+# Basic @Observed annotation
+curl http://localhost:8080/api/v1/tracing/micrometer/basic?input=sample-data
+
+# Micrometer with low-cardinality tags
+curl http://localhost:8080/api/v1/tracing/micrometer/tags?operationId=op-123
+
+# Nested Micrometer observations
+curl http://localhost:8080/api/v1/tracing/micrometer/nested?workflowId=wf-123
+```
+
+#### **Hybrid Approach (Both Together)**
+```bash
+# Demonstrates both working in harmony
+curl http://localhost:8080/api/v1/tracing/hybrid?operationId=hybrid-001
+```
+
+#### **Comparison Information**
+```bash
+# Get detailed comparison
+curl http://localhost:8080/api/v1/tracing/comparison
+
+# List all demo endpoints
+curl http://localhost:8080/api/v1/tracing/info
+```
+
+### **🎓 Micrometer Tracing Demo (Customer Service)**
 
 This repo includes a minimal, annotation-first Micrometer example that coexists with the custom OTel setup:
 
-- Controller: `MtrCustomerController` (GET `/api/v1/mtr/customers/{id}`)
-- Service: `MtrCustomerService`
-- Repository: `MtrCustomerRepository`
+- **Controller**: `MtrCustomerController` (GET `/api/v1/mtr/customers/{id}`)
+- **Service**: `MtrCustomerService`
+- **Repository**: `MtrCustomerRepository`
 - All annotated with `@Observed(...)` and enabled via `ObservedAspect` bean in `MicrometerObservationConfig`.
 
-Bridging to OTel: dependency `io.micrometer:micrometer-tracing-bridge-otel` is added. With this and the aspect, Micrometer observations create OTel spans that appear alongside the custom AOP spans.
+**Bridging to OTel**: dependency `io.micrometer:micrometer-tracing-bridge-otel` is added. With this and the aspect, Micrometer observations create OTel spans that appear alongside the custom AOP spans.
 
-Verify locally:
+**Verify locally:**
 
 ```bash
 # Start app
@@ -810,15 +914,94 @@ curl http://localhost:8080/actuator/metrics | jq
 curl "http://localhost:8080/actuator/metrics/http.server.requests" | jq
 ```
 
-Tests:
+**Tests:**
 
-- Unit: `MtrCustomerServiceTest` verifies deterministic mock behavior.
-- Integration: `MtrTracingIntegrationTest` boots Spring with an in-memory OTel exporter and asserts that controller/service/repository observations produced OTel spans (names/tags like `mtr.customer.*`, `customer.id`).
+- **Unit**: `MtrCustomerServiceTest` verifies deterministic mock behavior.
+- **Integration**: `MtrTracingIntegrationTest` boots Spring with an in-memory OTel exporter and asserts that controller/service/repository observations produced OTel spans (names/tags like `mtr.customer.*`, `customer.id`).
 
-Notes:
+**Notes:**
 
 - Keep observation names low-cardinality. Favor stable names and tag with `lowCardinalityKeyValues`.
 - In production, pick a single control plane (Micrometer or custom OTel). This POC keeps custom OTel primary and uses Micrometer for demo.
+
+### **💡 Recommendations for Production**
+
+#### **Choose Micrometer If:**
+- ✅ Your team prefers **property-driven configuration**
+- ✅ You need **metrics + tracing** in one abstraction
+- ✅ Standard Spring Boot observability is sufficient
+- ✅ You want **minimal code changes**
+- ✅ Team expertise is more Spring-focused
+
+#### **Choose OpenTelemetry If:**
+- ✅ You need **fine-grained span control**
+- ✅ **Baggage propagation** is critical
+- ✅ You're integrating with **AWS X-Ray** or multi-backend
+- ✅ You need **custom resource attributes**
+- ✅ Team has OpenTelemetry expertise
+
+#### **Use Hybrid Approach If:**
+- ✅ You need **both declarative and programmatic** control
+- ✅ Different teams prefer different approaches
+- ✅ Migration from one to another is in progress
+- ✅ **Complex scenarios** require flexibility
+
+### **🔧 Programmatic Tracing Utilities**
+
+This POC includes `TracingUtils.java` with 20+ helper methods:
+
+```java
+// Manual span creation
+TracingUtils.withSpan("operation-name", span -> {
+    span.setAttribute("custom.attribute", "value");
+    // Your business logic
+    return result;
+});
+
+// Nested spans
+TracingUtils.withNestedSpan("parent", "child", (parent, child) -> {
+    // Parent and child span context available
+    return result;
+});
+
+// Async tracing
+CompletableFuture<String> future = CompletableFuture.supplyAsync(
+    TracingUtils.wrapWithCurrentContext(() -> {
+        // Context automatically propagated
+        return asyncOperation();
+    })
+);
+
+// Baggage manipulation
+TracingUtils.setBaggage("user.id", userId);
+String userId = TracingUtils.getBaggage("user.id");
+
+// Custom span builder
+TracingUtils.spanBuilder("custom-operation")
+    .setSpanKind(SpanKind.INTERNAL)
+    .setAttribute("key", "value")
+    .startAndRun(() -> {
+        // Your logic
+    });
+```
+
+### **🌐 HTTP Client Tracing**
+
+Automatic CLIENT span creation for all HTTP calls:
+
+```java
+@Bean
+public RestTemplate tracedRestTemplate(RestTemplateBuilder builder) {
+    return builder
+        .interceptors(new TracingRestTemplateInterceptor())
+        .build();
+}
+```
+
+Every HTTP call now automatically creates a CLIENT span with:
+- HTTP method, URL, status code
+- W3C trace context propagation
+- Automatic parent-child relationship
 
 ### How to Enable Micrometer Tracing (Alternative Path)
 
@@ -907,7 +1090,343 @@ curl -u "$ACTUATOR_USER:$ACTUATOR_PASSWORD" http://localhost:8080/actuator/metri
 ./gradlew spotlessApply
 ```
 
-## 📌 Update Notes (2025-09-21)
+## �️ Complete Resilience4j Demo
+
+### **All 6 Patterns Demonstrated**
+
+This POC includes a **comprehensive Resilience4j demonstration** showing all patterns with multiple configurations:
+
+#### **Demo Service & Controller**
+- **Service**: `Resilience4jDemoService.java` - Complete pattern implementations
+- **Controller**: `Resilience4jDemoController.java` - REST endpoints for testing
+
+### **Pattern 1️⃣: Circuit Breaker**
+
+**Annotations:**
+```java
+@CircuitBreaker(name = "basicCircuitBreaker", fallbackMethod = "fallbackMethod")
+@CircuitBreaker(name = "multiTypeCB", fallbackMethod = "multiTypeFallback")
+```
+
+**Endpoints:**
+```bash
+# Basic circuit breaker
+curl http://localhost:8080/api/v1/resilience/circuit-breaker/basic?shouldFail=false
+
+# Multi-type circuit breaker (HTTP + timeout)
+curl http://localhost:8080/api/v1/resilience/circuit-breaker/multi-type?shouldFail=false
+```
+
+**Configuration:**
+```yaml
+resilience4j:
+  circuitbreaker:
+    instances:
+      basicCircuitBreaker:
+        failure-rate-threshold: 50        # Open after 50% failures
+        sliding-window-size: 10           # Last 10 calls
+        wait-duration-in-open-state: 10s  # Wait before half-open
+
+      multiTypeCB:
+        failure-rate-threshold: 30
+        slow-call-duration-threshold: 2s  # Treat slow calls as failures
+        slow-call-rate-threshold: 50
+```
+
+**Features Demonstrated:**
+- ✅ Failure rate based opening
+- ✅ Slow call detection
+- ✅ Half-open state transitions
+- ✅ Fallback methods
+- ✅ Multi-type error handling
+
+### **Pattern 2️⃣: Retry**
+
+**Annotations:**
+```java
+@Retry(name = "basicRetry")
+@Retry(name = "selectiveRetry", fallbackMethod = "retryFallback")
+```
+
+**Endpoints:**
+```bash
+# Basic retry (3 attempts)
+curl http://localhost:8080/api/v1/resilience/retry/basic?shouldFail=false
+
+# Selective retry (only on specific exceptions)
+curl http://localhost:8080/api/v1/resilience/retry/selective?shouldFail=false
+```
+
+**Configuration:**
+```yaml
+resilience4j:
+  retry:
+    instances:
+      basicRetry:
+        max-attempts: 3
+        wait-duration: 1s
+        exponential-backoff-multiplier: 2  # 1s, 2s, 4s
+
+      selectiveRetry:
+        max-attempts: 5
+        retry-exceptions:
+          - java.io.IOException
+          - java.util.concurrent.TimeoutException
+        ignore-exceptions:
+          - java.lang.IllegalArgumentException
+```
+
+**Features Demonstrated:**
+- ✅ Exponential backoff
+- ✅ Selective exception retry
+- ✅ Maximum attempts
+- ✅ Retry events
+- ✅ Fallback on exhaustion
+
+### **Pattern 3️⃣: Rate Limiter**
+
+**Annotations:**
+```java
+@RateLimiter(name = "basicRateLimiter")
+@RateLimiter(name = "waitingRateLimiter")
+```
+
+**Endpoints:**
+```bash
+# Basic rate limiter (fail fast)
+curl http://localhost:8080/api/v1/resilience/rate-limiter/basic
+
+# Waiting rate limiter (queue requests)
+curl http://localhost:8080/api/v1/resilience/rate-limiter/waiting
+```
+
+**Configuration:**
+```yaml
+resilience4j:
+  ratelimiter:
+    instances:
+      basicRateLimiter:
+        limit-for-period: 10               # 10 calls
+        limit-refresh-period: 1s           # Per second
+        timeout-duration: 0                # Fail immediately
+
+      waitingRateLimiter:
+        limit-for-period: 5
+        limit-refresh-period: 1s
+        timeout-duration: 5s               # Wait up to 5s
+```
+
+**Features Demonstrated:**
+- ✅ Per-second rate limiting
+- ✅ Fail-fast behavior
+- ✅ Request queuing
+- ✅ Timeout on wait
+- ✅ Fair usage enforcement
+
+### **Pattern 4️⃣: Bulkhead**
+
+**Annotations:**
+```java
+@Bulkhead(name = "semaphoreBulkhead", type = Bulkhead.Type.SEMAPHORE)
+@Bulkhead(name = "threadPoolBulkhead", type = Bulkhead.Type.THREADPOOL)
+```
+
+**Endpoints:**
+```bash
+# Semaphore bulkhead (limit concurrent calls)
+curl http://localhost:8080/api/v1/resilience/bulkhead/semaphore
+
+# Thread pool bulkhead (isolate threads)
+curl http://localhost:8080/api/v1/resilience/bulkhead/threadpool
+```
+
+**Configuration:**
+```yaml
+resilience4j:
+  bulkhead:
+    instances:
+      semaphoreBulkhead:
+        max-concurrent-calls: 3            # Only 3 at a time
+        max-wait-duration: 0               # Don't wait
+
+  thread-pool-bulkhead:
+    instances:
+      threadPoolBulkhead:
+        max-thread-pool-size: 4
+        core-thread-pool-size: 2
+        queue-capacity: 2
+```
+
+**Features Demonstrated:**
+- ✅ Semaphore isolation (shared threads)
+- ✅ Thread pool isolation (dedicated threads)
+- ✅ Queue capacity limits
+- ✅ Resource protection
+- ✅ Preventing thread starvation
+
+### **Pattern 5️⃣: Time Limiter**
+
+**Annotation:**
+```java
+@TimeLimiter(name = "basicTimeLimiter")
+```
+
+**Endpoint:**
+```bash
+# Time limiter for async operations
+curl http://localhost:8080/api/v1/resilience/time-limiter?delayMs=1000
+```
+
+**Configuration:**
+```yaml
+resilience4j:
+  timelimiter:
+    instances:
+      basicTimeLimiter:
+        timeout-duration: 3s               # Cancel after 3 seconds
+        cancel-running-future: true        # Stop the task
+```
+
+**Features Demonstrated:**
+- ✅ Async operation timeouts
+- ✅ Future cancellation
+- ✅ CompletableFuture support
+- ✅ Preventing hung operations
+
+### **Pattern 6️⃣: Cache**
+
+**Annotation:**
+```java
+@Cacheable(cacheNames = "demoCache")
+@Cacheable(cacheNames = "maxResilienceCache")
+```
+
+**Endpoints:**
+```bash
+# Basic cache
+curl http://localhost:8080/api/v1/resilience/cache/basic/user123
+
+# Cache with TTL
+curl http://localhost:8080/api/v1/resilience/cache/ttl/user456
+
+# Cache eviction
+curl -X DELETE http://localhost:8080/api/v1/resilience/cache/evict/user123
+```
+
+**Configuration:**
+```yaml
+resilience4j:
+  cache:
+    instances:
+      demoCache:
+        event-consumer-buffer-size: 10
+
+      maxResilienceCache:
+        event-consumer-buffer-size: 100
+
+spring:
+  cache:
+    caffeine:
+      spec: maximumSize=1000,expireAfterWrite=5m
+```
+
+**Features Demonstrated:**
+- ✅ Automatic caching
+- ✅ TTL-based eviction
+- ✅ Manual cache eviction
+- ✅ Cache statistics
+- ✅ Performance optimization
+
+### **🔄 Combined Patterns**
+
+#### **Triple Pattern (Rate Limiter + Circuit Breaker + Retry)**
+
+**Annotation:**
+```java
+@RateLimiter(name = "combinedPattern")
+@CircuitBreaker(name = "combinedPattern", fallbackMethod = "combinedFallback")
+@Retry(name = "combinedPattern")
+```
+
+**Endpoint:**
+```bash
+curl http://localhost:8080/api/v1/resilience/combined/triple?shouldFail=false
+```
+
+**Pattern Order:**
+1. **Rate Limiter** (outer) - Controls request rate
+2. **Circuit Breaker** (middle) - Prevents cascading failures
+3. **Retry** (inner) - Retries transient failures
+
+#### **Maximum Resilience (All 6 Patterns)**
+
+**Annotation:**
+```java
+@RateLimiter(name = "maxResilience")
+@CircuitBreaker(name = "maxResilience", fallbackMethod = "maxResilienceFallback")
+@Retry(name = "maxResilience")
+@Bulkhead(name = "maxResilience")
+@TimeLimiter(name = "maxResilience")
+@Cacheable(cacheNames = "maxResilienceCache")
+```
+
+**Endpoint:**
+```bash
+curl http://localhost:8080/api/v1/resilience/combined/max?operationId=op-123
+```
+
+**Pattern Execution Order:**
+1. **Cache** (first check)
+2. **Rate Limiter** (control rate)
+3. **Circuit Breaker** (fail fast if open)
+4. **Bulkhead** (limit concurrency)
+5. **Time Limiter** (timeout protection)
+6. **Retry** (transient failure handling)
+
+**Features Demonstrated:**
+- ✅ Full pattern composition
+- ✅ Optimal pattern ordering
+- ✅ Comprehensive fault tolerance
+- ✅ Production-ready configuration
+
+### **📊 Monitoring Resilience4j Patterns**
+
+```bash
+# Circuit Breaker events
+curl http://localhost:8080/actuator/circuitbreakerevents
+
+# Retry events
+curl http://localhost:8080/actuator/retryevents
+
+# Rate Limiter events
+curl http://localhost:8080/actuator/ratelimiterevents
+
+# Bulkhead events
+curl http://localhost:8080/actuator/bulkheadevents
+
+# Time Limiter events
+curl http://localhost:8080/actuator/timelimiterevents
+
+# Metrics
+curl http://localhost:8080/actuator/metrics/resilience4j.circuitbreaker.calls
+curl http://localhost:8080/actuator/metrics/resilience4j.retry.calls
+curl http://localhost:8080/actuator/metrics/resilience4j.ratelimiter.available.permissions
+```
+
+### **🎯 Pattern Selection Guide**
+
+| Use Case | Recommended Pattern(s) |
+|----------|------------------------|
+| **External API calls** | Circuit Breaker + Retry + Time Limiter |
+| **Database operations** | Circuit Breaker + Cache |
+| **Rate-limited APIs** | Rate Limiter + Retry |
+| **Resource-intensive ops** | Bulkhead + Time Limiter |
+| **High-frequency reads** | Cache + Circuit Breaker |
+| **Mission-critical flows** | All patterns combined |
+| **Async operations** | Time Limiter + Bulkhead (thread pool) |
+| **Multi-tenant systems** | Rate Limiter + Bulkhead |
+
+## �📌 Update Notes (2025-09-21)
 
 - Upgraded to Spring Boot 3.5.x.
 - Refreshed Resilience4j and OpenTelemetry exporter versions.

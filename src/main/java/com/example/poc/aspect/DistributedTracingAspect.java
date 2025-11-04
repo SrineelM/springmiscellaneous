@@ -35,9 +35,9 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
- * AOP aspect that creates/enriches spans with business context, extracts parent
- * context for SERVER spans, propagates baggage, and wires MDC for logs. Compact
- * helper methods keep the advice readable; comments trimmed for brevity.
+ * AOP aspect that creates/enriches spans with business context, extracts parent context for SERVER
+ * spans, propagates baggage, and wires MDC for logs. Compact helper methods keep the advice
+ * readable; comments trimmed for brevity.
  */
 @Aspect
 @Component

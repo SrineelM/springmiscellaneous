@@ -14,9 +14,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
- * Generates structured business IDs (txn/correlation/session/trace/batch) for
- * use in spans, baggage and logs. IDs are human-readable, include an instance
- * token for scale, and use salted hashing for privacy where needed.
+ * Generates structured business IDs (txn/correlation/session/trace/batch) for use in spans, baggage
+ * and logs. IDs are human-readable, include an instance token for scale, and use salted hashing for
+ * privacy where needed.
  */
 @Component
 public class BusinessContextIdGenerator {

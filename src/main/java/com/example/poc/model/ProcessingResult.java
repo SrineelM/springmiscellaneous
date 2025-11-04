@@ -7,8 +7,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Response DTO returned by the demo endpoints. Provides status, timing,
- * rich metadata, and business context with a small builder for convenience.
+ * Response DTO returned by the demo endpoints. Provides status, timing, rich metadata, and business
+ * context with a small builder for convenience.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ProcessingResult {
