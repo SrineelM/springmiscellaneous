@@ -1,0 +1,29 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Run tests for new Micrometer tracing example",
+			"type": "shell",
+			"command": "./gradlew test --tests com.example.poc.MtrCustomerServiceTest com.example.poc.MtrTracingIntegrationTest",
+			"group": "build"
+		},
+		{
+			"label": "Run unit tests for new Micrometer service",
+			"type": "shell",
+			"command": "./gradlew test --tests com.example.poc.MtrCustomerServiceTest",
+			"group": "build"
+		},
+		{
+			"label": "Run integration tests for new Micrometer example",
+			"type": "shell",
+			"command": "./gradlew test --tests com.example.poc.MtrTracingIntegrationTest",
+			"group": "build"
+		},
+		{
+			"label": "Re-run Micrometer tracing integration test",
+			"type": "shell",
+			"command": "./gradlew test --tests com.example.poc.MtrTracingIntegrationTest",
+			"group": "build"
+		}
+	]
+}
