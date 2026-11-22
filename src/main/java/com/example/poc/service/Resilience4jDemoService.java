@@ -56,32 +56,29 @@ public class Resilience4jDemoService {
   }
 
   /**
-   * Circuit Breaker with multiple fallback methods (type-specific).
+   * Circuit Breaker with overloaded fallback methods (type-specific).
    *
-   * <p>Demonstrates fallback method selection based on exception type.
+   * <p>Educational value: Resilience4j fallbackMethod accepts a single method name. Type-specific
+   * fallback handling is achieved by overloading that method with specific exception types;
+   * Resilience4j inspects parameter types and routes to the most specific matching overload.
    */
-  @CircuitBreaker(
-      name = "multiTypeCB",
-      fallbackMethod = "handleRuntimeException,handleGeneralException")
+  @CircuitBreaker(name = "multiTypeCB", fallbackMethod = "typedFallback")
   public String circuitBreakerWithTypedFallbacks(String exceptionType) {
     logger.info("Testing circuit breaker with exception type: {}", exceptionType);
 
-    switch (exceptionType) {
-      case "runtime":
-        throw new RuntimeException("Runtime exception triggered");
-      case "illegal":
-        throw new IllegalArgumentException("Illegal argument exception triggered");
-      default:
-        return "Success without exception";
-    }
+    return switch (exceptionType) {
+      case "runtime" -> throw new RuntimeException("Runtime exception triggered");
+      case "illegal" -> throw new IllegalArgumentException("Illegal argument exception triggered");
+      default -> "Success without exception";
+    };
   }
 
-  private String handleRuntimeException(String exceptionType, RuntimeException e) {
+  public String typedFallback(String exceptionType, RuntimeException e) {
     logger.warn("RuntimeException-specific fallback: {}", e.getMessage());
     return "Fallback for RuntimeException: " + e.getMessage();
   }
 
-  private String handleGeneralException(String exceptionType, Throwable t) {
+  public String typedFallback(String exceptionType, Throwable t) {
     logger.warn("General fallback: {}", t.getMessage());
     return "General fallback: " + t.getMessage();
   }
@@ -123,16 +120,11 @@ public class Resilience4jDemoService {
   public String selectiveRetryDemo(String exceptionType) {
     logger.info("Selective retry with exception: {}", exceptionType);
 
-    switch (exceptionType) {
-      case "retry":
-        // This will be retried (configured in retry-exceptions)
-        throw new RuntimeException("Retryable exception");
-      case "ignore":
-        // This will NOT be retried (configured in ignore-exceptions)
-        throw new IllegalArgumentException("Non-retryable exception");
-      default:
-        return "Success without exception";
-    }
+    return switch (exceptionType) {
+      case "retry" -> throw new RuntimeException("Retryable exception");
+      case "ignore" -> throw new IllegalArgumentException("Non-retryable exception");
+      default -> "Success without exception";
+    };
   }
 
   // ========================================================================================
@@ -283,10 +275,12 @@ public class Resilience4jDemoService {
   /**
    * Combination: Circuit Breaker + Retry + Rate Limiter.
    *
-   * <p>Order of execution (outside-in): 1. RateLimiter - Check if request is allowed 2.
-   * CircuitBreaker - Check circuit state 3. Retry - Execute with retry logic
-   *
-   * <p>This is the most common production pattern for external service calls.
+   * <p>Educational value - Resilience4j Aspect Order (outside-in):
+   * 1. Retry (outermost) - Retries wrap inner aspects, re-evaluating circuit breaker & rate limits on retry.
+   * 2. CircuitBreaker - Evaluates failure rate thresholds and circuit state.
+   * 3. RateLimiter (innermost of the three) - Enforces request rate limits before actual method invocation.
+   * Note: Annotation declaration order on the method does NOT determine execution order; Spring AOP aspect
+   * precedence (order property in application.yml) governs the execution chain.
    */
   @RateLimiter(name = "combinedPattern")
   @CircuitBreaker(name = "combinedPattern", fallbackMethod = "combinedFallback")

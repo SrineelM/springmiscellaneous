@@ -22,9 +22,8 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
-@SpringBootTest
+@PocTest
 @AutoConfigureMockMvc
-@ActiveProfiles("test")
 class TracingIntegrationTest {
 
   @Autowired private MockMvc mockMvc;
@@ -129,10 +128,6 @@ class TracingIntegrationTest {
     assertThat(serverSpan.getTraceId()).isEqualTo(traceId);
   }
 
-  // TODO(test): This test is disabled due to mismatch between span error/fallback attributes and
-  // test assertion logic. Revisit span instrumentation or test logic to ensure at least one span
-  // has both error status and fallback attribute if required.
-  @org.junit.jupiter.api.Disabled("Disabled: span error/fallback attribute assertion needs review.")
   @Test
   void fallback_span_has_error_status_and_fallback_attributes() throws Exception {
     // To force fallback, call the /test/circuit-breaker endpoint repeatedly to open the circuit
@@ -147,7 +142,7 @@ class TracingIntegrationTest {
       } catch (Exception ignored) {
       }
     }
-    // Now the circuit should be open, next call should fallback
+    // Circuit open routes to fallback handler returning 5xx with FALLBACK payload
     mockMvc
         .perform(
             get("/api/v1/processing/test/circuit-breaker")

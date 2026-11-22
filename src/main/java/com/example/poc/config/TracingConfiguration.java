@@ -1,5 +1,6 @@
 package com.example.poc.config;
 
+import io.opentelemetry.api.GlobalOpenTelemetry;
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.baggage.propagation.W3CBaggagePropagator;
 import io.opentelemetry.api.common.Attributes;
@@ -18,6 +19,8 @@ import io.opentelemetry.sdk.trace.samplers.Sampler;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -25,57 +28,20 @@ import org.springframework.context.annotation.EnableAspectJAutoProxy;
 import org.springframework.context.annotation.Profile;
 
 /**
- * =================================================================================================
- * ARCHITECTURAL REVIEW
- * =================================================================================================
+ * OpenTelemetry SDK configuration.
  *
- * <p>This class, `TracingConfiguration`, is responsible for setting up and configuring the entire
- * OpenTelemetry SDK. This is a critical piece of infrastructure-as-code, defining how traces are
- * collected, enriched, and exported.
- *
- * <p>Key Architectural Decisions & Best Practices: ------------------------------------------------
- * 1. `@Configuration` and `@Bean`: Correctly uses Spring's Java-based configuration to create and
- * manage the `OpenTelemetry` instance as a singleton bean. 2. `@EnableAspectJAutoProxy`: This is
- * essential. It enables Spring's support for processing components marked with `@Aspect`, which is
- * what activates the `DistributedTracingAspect`. 3. Externalized Configuration (`@Value`):
- * Hardcoding values is avoided. Key configuration parameters like product code, business unit, and
- * the OTLP endpoint are injected from `application.yml`. This makes the application flexible and
- * easy to configure for different environments. 4. Rich Resource Attributes: The creation of the
- * `Resource` object is a highlight. It merges default resources with a rich set of custom
- * attributes, including: - **Standard Semantic Conventions**: `service.name`, `service.version`,
- * etc. This ensures compatibility with standard OpenTelemetry UIs. - **Custom Business
- * Attributes**: `product.code`, `business.unit`, `cost.center`. This is where the business context
- * is injected at the source, tagging every single trace from this service with this metadata. -
- * **Build and Deployment Metadata**: `build.version`, `deployment.type`. This is invaluable for
- * debugging, as it tells you exactly which version of the code generated a trace. 5.
- * Production-Ready Exporter Configuration: The `BatchSpanProcessor` is configured with settings
- * that are suitable for a production environment (e.g., batch size, schedule delay, queue size,
- * gzip compression). This shows foresight beyond a simple POC. 6. Standard-Based Propagation: The
- * use of `W3CTraceContextPropagator` and `W3CBaggagePropagator` is the correct, modern approach. It
- * ensures interoperability with any other service or platform that follows the W3C Trace Context
- * standard. 7. Global Registration: `buildAndRegisterGlobal()` makes this OpenTelemetry instance
- * the default for the entire JVM, which is a common and effective strategy. 8. DI-Friendly Tracer
- * Bean: Expose a `Tracer` bean derived from the `OpenTelemetry` bean so components (like the AOP
- * aspect) can rely on Spring DI instead of static globals.
- *
- * <p>Role in the Architecture: ------------------------- - This class is the foundation of the
- * tracing system. It sets up the "factory" that produces tracers and spans. - It defines the
- * identity of this service in the distributed system via the `Resource` attributes. - It configures
- * how traces will be exported from the application (in this case, via OTLP gRPC).
- *
- * <p>Overall Feedback: ----------------- - This is a production-grade OpenTelemetry configuration.
- * It's comprehensive, flexible, and follows all current best practices. - The richness of the
- * resource attributes is a major strength, demonstrating a mature understanding of what makes a
- * tracing system truly useful in a large enterprise. - The configuration is clean, readable, and
- * well-commented.
- *
- * <p>This class perfectly sets the stage for the `DistributedTracingAspect` to do its work,
- * ensuring that every trace produced is rich with context and correctly exported.
- * =================================================================================================
+ * <p>Educational value:
+ * 1. Custom SDK vs Boot Auto-configuration: This POC explicitly constructs its own OpenTelemetry
+ *    bean, SdkTracerProvider, and BatchSpanProcessor to illustrate fine-grained programmatic control
+ *    over Resource attributes (business unit, product code) and W3C context propagators.
+ * 2. OTLP Exporter: Ingests via gRPC to the endpoint configured in management.otlp.tracing.endpoint.
+ * 3. Test Isolation: Uses an in-memory exporter in tests and catches GlobalOpenTelemetry re-registration
+ *    exceptions to allow multiple Spring ApplicationContexts in a single JVM without failure.
  */
 @Configuration
 @EnableAspectJAutoProxy
 public class TracingConfiguration {
+  private static final Logger logger = LoggerFactory.getLogger(TracingConfiguration.class);
 
   @Value("${app.product.code:ECOM-POC}")
   private String productCode;
@@ -95,14 +61,12 @@ public class TracingConfiguration {
   @Value("${management.otlp.tracing.endpoint:http://localhost:4317}")
   private String otlpEndpoint;
 
-  // Expose Resource as a bean so other components (and tests) can reuse/extend it.
   @Bean
   public Resource openTelemetryResource() {
     return Resource.getDefault()
         .merge(
             Resource.create(
                 Attributes.builder()
-                    // Standard OpenTelemetry semantic convention keys (avoid semconv dependency)
                     .put("service.name", applicationName)
                     .put("service.namespace", "ecommerce")
                     .put("service.version", "1.0.0")
@@ -111,24 +75,18 @@ public class TracingConfiguration {
                         System.getProperty(
                             "instance.id", java.net.InetAddress.getLoopbackAddress().getHostName()))
                     .put("deployment.environment", System.getProperty("environment", "development"))
-
-                    // Custom business attributes as discussed in the architecture overview
                     .put("app.name", "DistributedTracingPOC")
                     .put("product.code", productCode)
                     .put("business.unit", businessUnit)
                     .put("cost.center", costCenter)
                     .put("data.classification", dataClassification)
-
-                    // Build and deployment metadata for production traceability
                     .put(
                         "build.version",
                         getClass().getPackage().getImplementationVersion() != null
                             ? getClass().getPackage().getImplementationVersion()
                             : "dev-build")
                     .put("build.timestamp", Instant.now().toString())
-                    .put("deployment.type", "on-premises-monolith") // As per chat architecture
-
-                    // Infrastructure metadata
+                    .put("deployment.type", "on-premises-monolith")
                     .put("infrastructure.layer", "layer-1-monolith")
                     .put("java.version", System.getProperty("java.version"))
                     .put(
@@ -137,24 +95,20 @@ public class TracingConfiguration {
                     .build()));
   }
 
-  // Default OTLP exporter wrapped in a BatchSpanProcessor. Declared as a bean so tests can add
-  // additional processors (e.g., InMemory) without replacing this one.
   @Bean
   @Profile("!test")
   public SpanProcessor otlpBatchSpanProcessor() {
     return BatchSpanProcessor.builder(
             OtlpGrpcSpanExporter.builder()
-                .setEndpoint(otlpEndpoint) // Compatible with AWS X-Ray via ADOT Collector
-                .setCompression("gzip") // Optimize network traffic
+                .setEndpoint(otlpEndpoint)
+                .setCompression("gzip")
                 .build())
-        .setMaxExportBatchSize(512) // Batch size for efficiency
-        .setScheduleDelay(Duration.ofMillis(500)) // Regular export interval
-        .setMaxQueueSize(2048) // Queue size for high throughput
+        .setMaxExportBatchSize(512)
+        .setScheduleDelay(Duration.ofMillis(500))
+        .setMaxQueueSize(2048)
         .build();
   }
 
-  // Tracer provider assembled from resource and any declared SpanProcessor beans (including the
-  // default OTLP one above).
   @Bean
   public SdkTracerProvider sdkTracerProvider(
       Resource openTelemetryResource, List<SpanProcessor> spanProcessors) {
@@ -162,9 +116,6 @@ public class TracingConfiguration {
         SdkTracerProvider.builder()
             .setResource(openTelemetryResource)
             .setSampler(Sampler.alwaysOn());
-    // TODO(sampling): Replace alwaysOn with a parent-based traceidratio sampler in prod, e.g.:
-    // .setSampler(Sampler.parentBased(Sampler.traceIdRatioBased(0.1))) and externalize ratio per
-    // env.
     for (SpanProcessor processor : spanProcessors) {
       builder.addSpanProcessor(processor);
     }
@@ -172,24 +123,29 @@ public class TracingConfiguration {
   }
 
   /**
-   * Creates OpenTelemetry SDK from the tracer provider and registers W3C propagators. In non-test
-   * profiles, also registers as the GlobalOpenTelemetry instance.
+   * Builds OpenTelemetry SDK with W3C TraceContext and Baggage propagators.
+   * Registers globally while safely tolerating repeated registrations in test suites.
    */
   @Bean
   @Profile("!test")
   public OpenTelemetry openTelemetry(SdkTracerProvider sdkTracerProvider) {
-    return OpenTelemetrySdk.builder()
-        .setTracerProvider(sdkTracerProvider)
-        .setPropagators(
-            ContextPropagators.create(
-                TextMapPropagator.composite(
-                    W3CTraceContextPropagator.getInstance(), // Standard trace context
-                    W3CBaggagePropagator.getInstance() // Business context propagation
-                    )))
-        .buildAndRegisterGlobal();
+    OpenTelemetrySdk sdk =
+        OpenTelemetrySdk.builder()
+            .setTracerProvider(sdkTracerProvider)
+            .setPropagators(
+                ContextPropagators.create(
+                    TextMapPropagator.composite(
+                        W3CTraceContextPropagator.getInstance(),
+                        W3CBaggagePropagator.getInstance())))
+            .build();
+    try {
+      GlobalOpenTelemetry.set(sdk);
+    } catch (IllegalStateException e) {
+      logger.warn("GlobalOpenTelemetry already registered in JVM; reusing existing instance.");
+    }
+    return sdk;
   }
 
-  /** Test profile variant: do not register as global to avoid cross-context conflicts in JVM. */
   @Bean
   @Profile("test")
   public OpenTelemetry openTelemetryForTests(SdkTracerProvider sdkTracerProvider) {
@@ -198,22 +154,13 @@ public class TracingConfiguration {
         .setPropagators(
             ContextPropagators.create(
                 TextMapPropagator.composite(
-                    W3CTraceContextPropagator.getInstance(), W3CBaggagePropagator.getInstance())))
+                    W3CTraceContextPropagator.getInstance(),
+                    W3CBaggagePropagator.getInstance())))
         .build();
   }
 
-  /**
-   * Provide a DI-managed Tracer bean.
-   *
-   * <p>Why: While OpenTelemetrySdk registers a global, wiring a Tracer through Spring makes testing
-   * easier and avoids hidden static dependencies. This also clarifies which tracer namespace the
-   * application uses across components.
-   */
   @Bean
   public Tracer tracer(OpenTelemetry openTelemetry) {
     return openTelemetry.getTracer("com.example.poc.tracing");
   }
-
-  // TODO(processors): Consider adding a SpanProcessor for dynamic filtering/redaction
-  // (e.g., drop INTERNAL spans for chatty layers in prod, or mask attribute values by key).
 }

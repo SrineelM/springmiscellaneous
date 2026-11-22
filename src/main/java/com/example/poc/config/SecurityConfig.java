@@ -3,6 +3,7 @@ package com.example.poc.config;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.core.userdetails.User;
@@ -14,12 +15,14 @@ import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 
 /**
- * Security configuration to restrict Actuator endpoints only. - Application APIs are permitted
- * without authentication. - /actuator/health and /actuator/info are public (common practice). - All
- * other /actuator/** require HTTP Basic authentication.
+ * Security configuration locking down Spring Boot Actuator endpoints.
  *
- * <p>For production, plug in your organization’s user store (e.g., LDAP/OIDC) and disable the
- * in-memory user.
+ * <p>Educational value:
+ * 1. Health and info endpoints remain unauthenticated so container orchestrators (k8s liveness/readiness)
+ *    can probe without credentials.
+ * 2. Sensitive management endpoints (/actuator/**) require HTTP Basic authentication.
+ * 3. In the 'prod' profile, actuator credentials must be explicitly configured via environment variables
+ *    (ACTUATOR_USER and ACTUATOR_PASSWORD), failing fast at startup if missing or left as default.
  */
 @Configuration
 public class SecurityConfig {
@@ -27,34 +30,40 @@ public class SecurityConfig {
   @Bean
   public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
     http.csrf(csrf -> csrf.disable())
-        .authorizeHttpRequests(auth ->
-            auth.requestMatchers("/actuator/health", "/actuator/info")
-                .permitAll()
-                .requestMatchers("/actuator/**")
-                .authenticated() // NOTE: lock down actuator only
-                .anyRequest()
-                .permitAll())
+        .authorizeHttpRequests(
+            auth ->
+                auth.requestMatchers("/actuator/health", "/actuator/info")
+                    .permitAll()
+                    .requestMatchers("/actuator/**")
+                    .authenticated()
+                    .anyRequest()
+                    .permitAll())
         .httpBasic(Customizer.withDefaults());
-    // TODO(prod): Move actuator to a dedicated management port and restrict by network policy/IP
-    // allowlist
-    // TODO(auth): Replace basic auth with OIDC/LDAP and role-based access controls for actuator
-    // endpoints
     return http.build();
   }
 
-  /**
-   * In-memory user for local development/testing. Use environment variables for username/password
-   * or externalize via Vault/Config in real deployments.
-   */
   @Bean
   public UserDetailsService userDetailsService(
-      @Value("${spring.security.user:actuator}") String user,
-      @Value("${spring.security.password:actuator}") String password) {
+      @Value("${app.actuator.username:actuator}") String user,
+      @Value("${app.actuator.password:actuator}") String password,
+      Environment env) {
+    boolean isProd = env.matchesProfiles("prod");
+    if (isProd) {
+      if (password == null || password.isBlank() || "actuator".equals(password)) {
+        throw new IllegalStateException(
+            "Production security failure: ACTUATOR_PASSWORD must be explicitly configured and cannot use default credentials.");
+      }
+      if (user == null || user.isBlank()) {
+        throw new IllegalStateException(
+            "Production security failure: ACTUATOR_USER must be explicitly configured.");
+      }
+    }
+
     PasswordEncoder encoder = PasswordEncoderFactories.createDelegatingPasswordEncoder();
     UserDetails actuatorUser =
         User.withUsername(user)
             .password(encoder.encode(password))
-            .roles("ACTUATOR") // NOTE: dev-only in-memory user; replace with OIDC/LDAP in prod
+            .roles("ACTUATOR")
             .build();
     return new InMemoryUserDetailsManager(actuatorUser);
   }

@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.*;
  * <p>Each endpoint includes comprehensive logging and trace context propagation.
  */
 @RestController
-@RequestMapping("/api/v1/resilience4j")
+@RequestMapping({"/api/v1/resilience4j", "/api/v1/resilience"})
 public class Resilience4jDemoController {
   private static final Logger logger = LoggerFactory.getLogger(Resilience4jDemoController.class);
 
@@ -44,7 +44,7 @@ public class Resilience4jDemoController {
    *
    * <p>Send multiple failures to open the circuit, then observe the OPEN state behavior.
    */
-  @GetMapping("/circuit-breaker")
+  @GetMapping({"/circuit-breaker", "/circuit-breaker/basic"})
   public ResponseEntity<ProcessingResult> testCircuitBreaker(
       @RequestParam(defaultValue = "false") boolean shouldFail) {
     logger.info("Testing circuit breaker with shouldFail={}", shouldFail);
@@ -92,13 +92,15 @@ public class Resilience4jDemoController {
    * /api/v1/resilience4j/retry?attemptToFail=2 (Success after 2 retries) - GET
    * /api/v1/resilience4j/retry?attemptToFail=5 (Exhausts all retries, triggers fallback)
    */
-  @GetMapping("/retry")
+  @GetMapping({"/retry", "/retry/basic"})
   public ResponseEntity<ProcessingResult> testRetry(
-      @RequestParam(defaultValue = "0") int attemptToFail) {
-    logger.info("Testing retry with attemptToFail={}", attemptToFail);
+      @RequestParam(defaultValue = "0") int attemptToFail,
+      @RequestParam(value = "shouldFail", required = false) Boolean shouldFail) {
+    int attempts = (shouldFail != null && shouldFail) ? 5 : attemptToFail;
+    logger.info("Testing retry with attemptToFail={}", attempts);
 
     try {
-      String result = demoService.basicRetryDemo(attemptToFail);
+      String result = demoService.basicRetryDemo(attempts);
       return ResponseEntity.ok(buildSuccessResult("retry", result));
     } catch (Exception e) {
       logger.error("Retry test failed", e);
@@ -113,13 +115,15 @@ public class Resilience4jDemoController {
    * /api/v1/resilience4j/retry-selective?exceptionType=ignore (No retry) - GET
    * /api/v1/resilience4j/retry-selective?exceptionType=none (Success)
    */
-  @GetMapping("/retry-selective")
+  @GetMapping({"/retry-selective", "/retry/selective"})
   public ResponseEntity<ProcessingResult> testSelectiveRetry(
-      @RequestParam(defaultValue = "none") String exceptionType) {
-    logger.info("Testing selective retry with exceptionType={}", exceptionType);
+      @RequestParam(defaultValue = "none") String exceptionType,
+      @RequestParam(value = "shouldFail", required = false) Boolean shouldFail) {
+    String type = (shouldFail != null && shouldFail) ? "ignore" : exceptionType;
+    logger.info("Testing selective retry with exceptionType={}", type);
 
     try {
-      String result = demoService.selectiveRetryDemo(exceptionType);
+      String result = demoService.selectiveRetryDemo(type);
       return ResponseEntity.ok(buildSuccessResult("retry-selective", result));
     } catch (Exception e) {
       logger.error("Selective retry test failed", e);
@@ -138,7 +142,7 @@ public class Resilience4jDemoController {
    * <p>Usage: Send 15+ requests within 1 second to trigger rate limiting - curl
    * http://localhost:8080/api/v1/resilience4j/rate-limiter?requestId=req-{1..20}
    */
-  @GetMapping("/rate-limiter")
+  @GetMapping({"/rate-limiter", "/rate-limiter/basic"})
   public ResponseEntity<ProcessingResult> testRateLimiter(
       @RequestParam(defaultValue = "req-001") String requestId) {
     logger.info("Testing rate limiter for request: {}", requestId);
@@ -158,7 +162,7 @@ public class Resilience4jDemoController {
    *
    * <p>This endpoint waits up to 500ms for permission instead of failing immediately.
    */
-  @GetMapping("/rate-limiter-wait")
+  @GetMapping({"/rate-limiter-wait", "/rate-limiter/waiting"})
   public ResponseEntity<ProcessingResult> testRateLimiterWithWait(
       @RequestParam(defaultValue = "req-001") String requestId) {
     logger.info("Testing rate limiter with wait for request: {}", requestId);
@@ -182,7 +186,7 @@ public class Resilience4jDemoController {
    *
    * <p>Send 5+ concurrent requests to trigger bulkhead limits.
    */
-  @GetMapping("/bulkhead-semaphore")
+  @GetMapping({"/bulkhead-semaphore", "/bulkhead/semaphore"})
   public ResponseEntity<ProcessingResult> testSemaphoreBulkhead(
       @RequestParam(defaultValue = "task-001") String taskId) {
     logger.info("Testing semaphore bulkhead for task: {}", taskId);
@@ -202,7 +206,7 @@ public class Resilience4jDemoController {
    *
    * <p>Uses separate thread pool for isolation.
    */
-  @GetMapping("/bulkhead-threadpool")
+  @GetMapping({"/bulkhead-threadpool", "/bulkhead/threadpool"})
   public ResponseEntity<ProcessingResult> testThreadPoolBulkhead(
       @RequestParam(defaultValue = "task-001") String taskId) throws Exception {
     logger.info("Testing thread pool bulkhead for task: {}", taskId);
@@ -228,13 +232,16 @@ public class Resilience4jDemoController {
    * <p>Usage: - GET /api/v1/resilience4j/time-limiter?processingTimeMs=1000 (Success, under limit)
    * - GET /api/v1/resilience4j/time-limiter?processingTimeMs=5000 (Timeout, triggers fallback)
    */
-  @GetMapping("/time-limiter")
+  @GetMapping({"/time-limiter", "/time-limiter/basic"})
   public ResponseEntity<ProcessingResult> testTimeLimiter(
-      @RequestParam(defaultValue = "1000") int processingTimeMs) throws Exception {
-    logger.info("Testing time limiter with processing time: {}ms", processingTimeMs);
+      @RequestParam(value = "processingTimeMs", required = false) Integer processingTimeMs,
+      @RequestParam(value = "delayMs", required = false) Integer delayMs)
+      throws Exception {
+    int duration = processingTimeMs != null ? processingTimeMs : (delayMs != null ? delayMs : 1000);
+    logger.info("Testing time limiter with processing time: {}ms", duration);
 
     try {
-      CompletableFuture<String> futureResult = demoService.timeLimiterDemo(processingTimeMs);
+      CompletableFuture<String> futureResult = demoService.timeLimiterDemo(duration);
       String result = futureResult.get(); // Wait for completion
       return ResponseEntity.ok(buildSuccessResult("time-limiter", result));
     } catch (Exception e) {
@@ -253,7 +260,7 @@ public class Resilience4jDemoController {
    *
    * <p>First call is slow (1s), subsequent calls with same userId are instant (cached).
    */
-  @GetMapping("/cache/{userId}")
+  @GetMapping({"/cache/{userId}", "/cache/basic/{userId}"})
   public ResponseEntity<ProcessingResult> testCacheable(@PathVariable String userId) {
     logger.info("Testing cacheable for user: {}", userId);
 
@@ -279,7 +286,7 @@ public class Resilience4jDemoController {
   }
 
   /** Test cache evict (removes specific entry). */
-  @DeleteMapping("/cache/{userId}")
+  @DeleteMapping({"/cache/{userId}", "/cache/evict/{userId}"})
   public ResponseEntity<ProcessingResult> testCacheEvict(@PathVariable String userId) {
     logger.info("Testing cache evict for user: {}", userId);
 
@@ -306,9 +313,10 @@ public class Resilience4jDemoController {
    *
    * <p>This is the most common production pattern for external service calls.
    */
-  @GetMapping("/combined-triple")
+  @GetMapping({"/combined-triple", "/combined/triple"})
   public ResponseEntity<ProcessingResult> testTriplePattern(
-      @RequestParam(defaultValue = "op-001") String operationId) {
+      @RequestParam(defaultValue = "op-001") String operationId,
+      @RequestParam(value = "shouldFail", required = false) Boolean shouldFail) {
     logger.info("Testing triple pattern combination for operation: {}", operationId);
 
     try {
@@ -326,7 +334,7 @@ public class Resilience4jDemoController {
    *
    * <p>Demonstrates: RateLimiter + CircuitBreaker + Retry + TimeLimiter + Bulkhead + Cache
    */
-  @GetMapping("/combined-max")
+  @GetMapping({"/combined-max", "/combined/max"})
   public ResponseEntity<ProcessingResult> testMaximumResilience(
       @RequestParam(defaultValue = "op-001") String operationId) throws Exception {
     logger.info("Testing maximum resilience for operation: {}", operationId);

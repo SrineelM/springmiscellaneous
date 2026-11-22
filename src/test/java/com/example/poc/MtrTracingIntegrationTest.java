@@ -23,9 +23,8 @@ import org.springframework.test.web.servlet.MockMvc;
  * Integration test validating that Micrometer {@code @Observed} annotations produce OTel spans via
  * the bridge and show up in the in-memory exporter.
  */
-@SpringBootTest
+@PocTest
 @AutoConfigureMockMvc
-@ActiveProfiles("test")
 class MtrTracingIntegrationTest {
 
   @Autowired private MockMvc mockMvc;

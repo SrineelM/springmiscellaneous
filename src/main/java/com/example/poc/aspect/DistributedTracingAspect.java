@@ -146,63 +146,65 @@ public class DistributedTracingAspect {
     // Add business operation metadata from annotations
     addBusinessOperationMetadata(span, joinPoint);
 
-    // Setup MDC for structured logging integration
-    setupMDCContext(businessTransactionId, correlationId, userId, actionType, span);
+    // Setup MDC for structured logging integration, saving outer context to prevent nested clearing
+    Map<String, String> previousMDC = MDC.getCopyOfContextMap();
+    try {
+      setupMDCContext(businessTransactionId, correlationId, userId, actionType, span);
 
-    try (Scope scope = span.makeCurrent()) {
+      try (Scope scope = span.makeCurrent()) {
 
-      // Create and propagate baggage for downstream services as discussed
-      Baggage baggage =
-          createBusinessBaggage(
+        // Create and propagate baggage for downstream services
+        Baggage baggage =
+            createBusinessBaggage(
+                businessTransactionId,
+                correlationId,
+                traceId,
+                userId,
+                actionType,
+                sessionId,
+                operationId);
+
+        try (Scope baggageScope = baggage.makeCurrent()) {
+          long startTime = System.currentTimeMillis();
+          span.addEvent("method.execution.start");
+
+          logger.debug(
+              "Starting execution of {}.{} with business context - TxnId: {}, CorrelationId: {}, UserId: {}",
+              className,
+              methodName,
               businessTransactionId,
               correlationId,
-              traceId,
-              userId,
-              actionType,
-              sessionId,
-              operationId);
+              userId);
 
-      try (Scope baggageScope = baggage.makeCurrent()) {
-        long startTime = System.currentTimeMillis();
-        span.addEvent("method.execution.start");
+          Object result = joinPoint.proceed();
 
-        logger.debug(
-            "Starting execution of {}.{} with business context - TxnId: {}, CorrelationId: {}, UserId: {}",
-            className,
-            methodName,
-            businessTransactionId,
-            correlationId,
-            userId);
+          long duration = System.currentTimeMillis() - startTime;
+          span.setAttribute("execution.duration_ms", duration).addEvent("method.execution.end");
 
-        Object result = joinPoint.proceed();
+          addReturnValueInfo(span, result, methodName, joinPoint);
 
-        long duration = System.currentTimeMillis() - startTime;
-        span.setAttribute("execution.duration_ms", duration).addEvent("method.execution.end");
+          span.setStatus(StatusCode.OK);
+          logger.info(
+              "Successfully completed {}.{} in {}ms - TxnId: {}",
+              className,
+              methodName,
+              duration,
+              businessTransactionId);
 
-        // Add return value information selectively
-        // TODO(security): If you enable includeReturnValue or includeArgs, ensure sensitive data
-        // masking
-        // and allowlist parameter names/types to avoid leaking secrets in traces/logs.
-        addReturnValueInfo(span, result, methodName, joinPoint);
-
-        // Log successful completion
-        span.setStatus(StatusCode.OK);
-        logger.info(
-            "Successfully completed {}.{} in {}ms - TxnId: {}",
-            className,
-            methodName,
-            duration,
-            businessTransactionId);
-
-        return result;
+          return result;
+        }
+      } catch (Throwable t) {
+        handleException(span, t, className, methodName, businessTransactionId, correlationId);
+        throw t;
+      } finally {
+        span.end();
       }
-    } catch (Exception e) {
-      // Comprehensive error handling with business context
-      handleException(span, e, className, methodName, businessTransactionId, correlationId);
-      throw e;
     } finally {
-      span.end();
-      clearMDCContext();
+      if (previousMDC != null) {
+        MDC.setContextMap(previousMDC);
+      } else {
+        MDC.clear();
+      }
     }
   }
 
@@ -516,7 +518,7 @@ public class DistributedTracingAspect {
   /** Handles exceptions with comprehensive error context */
   private void handleException(
       Span span,
-      Exception e,
+      Throwable e,
       String className,
       String methodName,
       String businessTransactionId,
@@ -644,7 +646,7 @@ public class DistributedTracingAspect {
     return false;
   }
 
-  private String getStackTraceAsString(Exception e) {
+  private String getStackTraceAsString(Throwable e) {
     return Arrays.stream(e.getStackTrace())
         .limit(5) // Limit stack trace length
         .map(StackTraceElement::toString)

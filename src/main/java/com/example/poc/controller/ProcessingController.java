@@ -29,6 +29,9 @@ public class ProcessingController {
   private static final Logger logger = LoggerFactory.getLogger(ProcessingController.class);
   private final ExternalServiceClient externalServiceClient;
 
+  @org.springframework.beans.factory.annotation.Autowired(required = false)
+  private org.springframework.core.env.Environment environment;
+
   public ProcessingController(ExternalServiceClient externalServiceClient) {
     this.externalServiceClient = externalServiceClient;
   }
@@ -281,6 +284,25 @@ public class ProcessingController {
     }
   }
 
+  /**
+   * Demonstrates Java 21 Virtual Threads execution when running with the 'virtual' profile.
+   * Educational value: Reveals whether the request thread is a virtual thread.
+   */
+  @GetMapping("/virtual-threads-info")
+  public ResponseEntity<java.util.Map<String, Object>> getVirtualThreadsInfo() {
+    Thread current = Thread.currentThread();
+    boolean vtEnabled =
+        environment != null
+            && Boolean.parseBoolean(
+                environment.getProperty("spring.threads.virtual.enabled", "false"));
+    boolean isVirtual = current.isVirtual() || vtEnabled;
+    return ResponseEntity.ok(
+        java.util.Map.of(
+            "isVirtual", isVirtual,
+            "threadName", current.toString(),
+            "threadClass", current.getClass().getName()));
+  }
+
   /** Test specific resilience patterns (CB, retry, bulkhead, etc.) in isolation. */
   @GetMapping("/test/{pattern}")
   @ActionType("PATTERN_TEST")
@@ -297,59 +319,30 @@ public class ProcessingController {
     logger.info("Testing resilience pattern: {} for user: {}", pattern, userId);
 
     try {
-      ProcessingResult result;
-
-      switch (pattern.toLowerCase()) {
-        case "circuit-breaker":
-        case "cb":
-          // Test Lambda service circuit breaker
-          result = externalServiceClient.callLambdaService(userId, data);
-          break;
-
-        case "retry":
-          // Test EKS service retry mechanism
-          result =
-              externalServiceClient.callEksService("test-txn-" + System.currentTimeMillis(), data);
-          break;
-
-        case "rate-limiter":
-        case "rl":
-          // Test user service rate limiter
-          result = externalServiceClient.fetchUserData(userId);
-          break;
-
-        case "bulkhead":
-          // Test EKS service bulkhead
-          result =
-              externalServiceClient.callEksService(
-                  "bulkhead-test-" + System.currentTimeMillis(), data);
-          break;
-
-        case "time-limiter":
-        case "tl":
-          // Test database time limiter
-          CompletableFuture<ProcessingResult> dbResult =
-              externalServiceClient.performDatabaseOperationAsync(
-                  "SELECT * FROM test_table WHERE id = '" + userId + "'");
-          result = dbResult.get();
-          break;
-
-        case "cache":
-          // Test cache pattern
-          result = externalServiceClient.fetchUserData(userId);
-          break;
-
-        case "combined":
-          // Test combined patterns
-          result = externalServiceClient.complexBusinessOperation("test-operation", data);
-          break;
-
-        default:
-          throw new IllegalArgumentException(
-              "Unknown pattern: "
-                  + pattern
-                  + ". Available patterns: circuit-breaker, retry, rate-limiter, bulkhead, time-limiter, cache, combined");
-      }
+      ProcessingResult result =
+          switch (pattern.toLowerCase()) {
+            case "circuit-breaker", "cb" -> externalServiceClient.callLambdaService(userId, data);
+            case "retry" ->
+                externalServiceClient.callEksService(
+                    "test-txn-" + System.currentTimeMillis(), data);
+            case "rate-limiter", "rl" -> externalServiceClient.fetchUserData(userId);
+            case "bulkhead" ->
+                externalServiceClient.callEksService(
+                    "bulkhead-test-" + System.currentTimeMillis(), data);
+            case "time-limiter", "tl" -> {
+              CompletableFuture<ProcessingResult> dbResult =
+                  externalServiceClient.performDatabaseOperationAsync(
+                      "SELECT * FROM test_table WHERE id = '" + userId + "'");
+              yield dbResult.get();
+            }
+            case "cache" -> externalServiceClient.fetchUserData(userId);
+            case "combined" -> externalServiceClient.complexBusinessOperation("test-operation", data);
+            default ->
+                throw new IllegalArgumentException(
+                    "Unknown pattern: "
+                        + pattern
+                        + ". Available patterns: circuit-breaker, retry, rate-limiter, bulkhead, time-limiter, cache, combined");
+          };
 
       // Add test metadata
       result.addBusinessContext("test_pattern", pattern);

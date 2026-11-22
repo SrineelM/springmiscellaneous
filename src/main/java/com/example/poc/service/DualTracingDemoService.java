@@ -70,7 +70,7 @@ public class DualTracingDemoService {
 
           TracingUtils.addEvent("operation.completed");
 
-          return "Programmatic OpenTelemetry span created for: " + operation;
+          return "Programmatic OpenTelemetry Tracing: span created for: " + operation;
         });
   }
 
@@ -131,7 +131,7 @@ public class DualTracingDemoService {
           }
 
           TracingUtils.addEvent("workflow.completed");
-          return "Workflow " + workflowId + " completed with nested spans";
+          return "Nested Spans Example: Workflow " + workflowId + " completed with nested spans";
         });
   }
 
@@ -162,7 +162,7 @@ public class DualTracingDemoService {
           TracingUtils.addAttribute("http.status_code", 200);
           TracingUtils.addEvent("http.response.received");
 
-          return "External call to " + serviceUrl + " completed";
+          return "CLIENT Span Example: HTTP call to " + serviceUrl + " completed successfully";
         });
   }
 
@@ -192,7 +192,7 @@ public class DualTracingDemoService {
                           () -> {
                             TracingUtils.addAttribute("task.type", "background");
                             simulateWork(150);
-                            return "Async task " + taskId + " completed";
+                            return "Async Tracing Example: Async task " + taskId + " completed";
                           });
                     } catch (Exception e) {
                       logger.error("Async task failed", e);
@@ -223,7 +223,7 @@ public class DualTracingDemoService {
           simulateWork(100);
           TracingUtils.addEvent("operation.processing");
           simulateWork(50);
-          return "Custom span builder executed for: " + operationId;
+          return "Custom Span Builder Example: Custom span builder executed for: " + operationId;
         });
   }
 
@@ -257,7 +257,7 @@ public class DualTracingDemoService {
               "Baggage retrieved - User: {}, Tenant: {}", userFromBaggage, tenantFromBaggage);
 
           // Call nested operation - baggage automatically propagates
-          return "Baggage propagated for user: "
+          return "Baggage Example: Baggage propagated for user: "
               + userFromBaggage
               + ", tenant: "
               + tenantFromBaggage;
@@ -286,7 +286,7 @@ public class DualTracingDemoService {
   public String basicMicrometerTracing(String input) {
     logger.info("Executing basic Micrometer tracing for: {}", input);
     simulateWork(100);
-    return "Micrometer observation created for: " + input;
+    return "Basic Micrometer Tracing: observation created for: " + input;
   }
 
   /**
@@ -301,7 +301,7 @@ public class DualTracingDemoService {
   public String micrometerWithTags(String operationId) {
     logger.info("Executing Micrometer tracing with tags for: {}", operationId);
     simulateWork(150);
-    return "Micrometer operation with tags completed: " + operationId;
+    return "Micrometer with Tags: operation with tags completed: " + operationId;
   }
 
   /**
@@ -322,7 +322,7 @@ public class DualTracingDemoService {
     String childResult = childMicrometerOperation(workflowId);
 
     simulateWork(50);
-    return "Nested observations completed: " + childResult;
+    return "Nested Micrometer Observations: completed: " + childResult;
   }
 
   @Observed(
@@ -389,7 +389,7 @@ public class DualTracingDemoService {
             });
 
     return String.format(
-        "Hybrid tracing completed: %s -> %s -> %s (operation: %s)",
+        "Hybrid Tracing Example: completed: %s -> %s -> %s (operation: %s)",
         step1, step2, step3, operationId);
   }
 
@@ -401,17 +401,19 @@ public class DualTracingDemoService {
   public Map<String, String> getTracingComparison() {
     return Map.of(
         "opentelemetry_approach",
-            "Programmatic, vendor-neutral, maximum control, rich semantic attributes",
-        "opentelemetry_use_cases",
-            "Custom span logic, vendor-specific features, fine-grained control, complex workflows",
-        "micrometer_approach", "Declarative, Spring-native, annotation-based, property-driven",
-        "micrometer_use_cases",
-            "Standard REST endpoints, simple service methods, uniform metrics/tracing",
-        "can_they_coexist",
-            "YES! micrometer-tracing-bridge-otel bridges Micrometer to OpenTelemetry",
-        "recommendation", "Use Micrometer for standard cases, OpenTelemetry for advanced scenarios",
-        "best_practice",
-            "Choose one as primary, use the other for specific needs (as shown in hybrid example)");
+            "Programmatic, vendor-neutral, maximum control, rich semantic attributes with fine-grained control",
+        "when_to_use_opentelemetry",
+            "Custom span manipulation, fine-grained control, vendor-specific features, and manual context propagation",
+        "micrometer_approach",
+            "Declarative, Spring-native, annotation-based (@Observed), property-driven with micrometer-tracing-bridge-otel",
+        "when_to_use_micrometer",
+            "Standard Spring Boot services, uniform metrics/tracing, and low-boilerplate observation",
+        "hybrid_approach",
+            "Use Micrometer for overall flow and OpenTelemetry for fine-grained sub-span steps",
+        "key_difference",
+            "Declarative vs programmatic span lifecycle management",
+        "recommendation",
+            "Use Micrometer for standard cases, OpenTelemetry for advanced scenarios");
   }
 
   // ========================================================================================

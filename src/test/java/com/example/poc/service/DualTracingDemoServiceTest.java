@@ -2,18 +2,18 @@ package com.example.poc.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.example.poc.PocTest;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 
 /**
  * Integration tests for DualTracingDemoService.
  *
  * <p>Tests both OpenTelemetry (programmatic) and Micrometer (declarative) tracing approaches.
  */
-@SpringBootTest
+@PocTest
 class DualTracingDemoServiceTest {
 
   @Autowired private DualTracingDemoService service;
