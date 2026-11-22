@@ -145,27 +145,23 @@ class DualTracingDemoServiceTest {
     // Assert
     assertThat(comparison).isNotNull();
     assertThat(comparison).isNotEmpty();
-    assertThat(comparison).containsKeys(
-        "opentelemetry_approach",
-        "micrometer_approach",
-        "when_to_use_opentelemetry",
-        "when_to_use_micrometer",
-        "hybrid_approach",
-        "key_difference",
-        "recommendation"
-    );
+    assertThat(comparison)
+        .containsKeys(
+            "opentelemetry_approach",
+            "micrometer_approach",
+            "when_to_use_opentelemetry",
+            "when_to_use_micrometer",
+            "hybrid_approach",
+            "key_difference",
+            "recommendation");
 
     // Verify content
     assertThat(comparison.get("opentelemetry_approach"))
         .contains("Programmatic")
         .contains("fine-grained control");
-    assertThat(comparison.get("micrometer_approach"))
-        .contains("Declarative")
-        .contains("@Observed");
-    assertThat(comparison.get("when_to_use_opentelemetry"))
-        .contains("custom span manipulation");
-    assertThat(comparison.get("when_to_use_micrometer"))
-        .contains("standard Spring Boot");
+    assertThat(comparison.get("micrometer_approach")).contains("Declarative").contains("@Observed");
+    assertThat(comparison.get("when_to_use_opentelemetry")).contains("custom span manipulation");
+    assertThat(comparison.get("when_to_use_micrometer")).contains("standard Spring Boot");
   }
 
   // ==================== Multiple Calls Test ====================

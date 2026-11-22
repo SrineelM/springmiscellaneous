@@ -184,22 +184,21 @@ public class DualTracingDemoService {
           // Wrap async operation to propagate context
           CompletableFuture<String> future =
               CompletableFuture.supplyAsync(
-                  TracingUtils.wrapWithContext(
-                      () -> {
-                        try {
-                          return TracingUtils.withSpan(
-                              tracer,
-                              "async.task.execute",
-                              () -> {
-                                TracingUtils.addAttribute("task.type", "background");
-                                simulateWork(150);
-                                return "Async task " + taskId + " completed";
-                              });
-                        } catch (Exception e) {
-                          logger.error("Async task failed", e);
-                          return "Async task failed: " + e.getMessage();
-                        }
-                      }));
+                  TracingUtils.wrapWithContext(() -> {
+                    try {
+                      return TracingUtils.withSpan(
+                          tracer,
+                          "async.task.execute",
+                          () -> {
+                            TracingUtils.addAttribute("task.type", "background");
+                            simulateWork(150);
+                            return "Async task " + taskId + " completed";
+                          });
+                    } catch (Exception e) {
+                      logger.error("Async task failed", e);
+                      return "Async task failed: " + e.getMessage();
+                    }
+                  }));
 
           TracingUtils.addEvent("async.tasks.submitted");
           return future;
@@ -220,13 +219,12 @@ public class DualTracingDemoService {
         .withAttribute("operation.category", "advanced")
         .withAttribute("operation.version", "2.0")
         .withEvent("operation.initialization")
-        .execute(
-            () -> {
-              simulateWork(100);
-              TracingUtils.addEvent("operation.processing");
-              simulateWork(50);
-              return "Custom span builder executed for: " + operationId;
-            });
+        .execute(() -> {
+          simulateWork(100);
+          TracingUtils.addEvent("operation.processing");
+          simulateWork(50);
+          return "Custom span builder executed for: " + operationId;
+        });
   }
 
   /**

@@ -27,14 +27,13 @@ public class SecurityConfig {
   @Bean
   public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
     http.csrf(csrf -> csrf.disable())
-        .authorizeHttpRequests(
-            auth ->
-                auth.requestMatchers("/actuator/health", "/actuator/info")
-                    .permitAll()
-                    .requestMatchers("/actuator/**")
-                    .authenticated() // NOTE: lock down actuator only
-                    .anyRequest()
-                    .permitAll())
+        .authorizeHttpRequests(auth ->
+            auth.requestMatchers("/actuator/health", "/actuator/info")
+                .permitAll()
+                .requestMatchers("/actuator/**")
+                .authenticated() // NOTE: lock down actuator only
+                .anyRequest()
+                .permitAll())
         .httpBasic(Customizer.withDefaults());
     // TODO(prod): Move actuator to a dedicated management port and restrict by network policy/IP
     // allowlist

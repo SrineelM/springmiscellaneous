@@ -458,11 +458,10 @@ public class TracingUtils {
     }
 
     public void execute(Runnable operation) throws Exception {
-      execute(
-          () -> {
-            operation.run();
-            return null;
-          });
+      execute(() -> {
+        operation.run();
+        return null;
+      });
     }
   }
 

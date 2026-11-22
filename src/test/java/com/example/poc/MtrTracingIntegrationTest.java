@@ -80,46 +80,38 @@ class MtrTracingIntegrationTest {
     // Micrometer spans: prefer name match; AOP spans: may carry http.route
     boolean hasController =
         spans.stream()
-            .anyMatch(
-                s ->
-                    s.getName().contains("mtr.customer.controller")
-                        || s.getName().contains("mtrcustomer.getCustomer")
-                        || "/customers/{id}"
-                            .equals(
-                                s.getAttributes()
-                                    .get(
-                                        io.opentelemetry.api.common.AttributeKey.stringKey(
-                                            "endpoint")))
-                        || "/api/v1/mtr/customers/{id}"
-                            .equals(
-                                s.getAttributes()
-                                    .get(
-                                        io.opentelemetry.api.common.AttributeKey.stringKey(
-                                            "http.route"))));
+            .anyMatch(s ->
+                s.getName().contains("mtr.customer.controller")
+                    || s.getName().contains("mtrcustomer.getCustomer")
+                    || "/customers/{id}"
+                        .equals(
+                            s.getAttributes()
+                                .get(
+                                    io.opentelemetry.api.common.AttributeKey.stringKey("endpoint")))
+                    || "/api/v1/mtr/customers/{id}"
+                        .equals(
+                            s.getAttributes()
+                                .get(
+                                    io.opentelemetry.api.common.AttributeKey.stringKey(
+                                        "http.route"))));
     // Service observation should tag customer.id and/or carry observed name
     boolean hasService =
         spans.stream()
-            .anyMatch(
-                s ->
-                    s.getName().contains("mtr.customer.service")
-                        || s.getName().contains("mtrcustomerservice.getCustomer")
-                        || (s.getAttributes()
-                                .get(
-                                    io.opentelemetry.api.common.AttributeKey.stringKey(
-                                        "customer.id"))
-                            != null));
+            .anyMatch(s ->
+                s.getName().contains("mtr.customer.service")
+                    || s.getName().contains("mtrcustomerservice.getCustomer")
+                    || (s.getAttributes()
+                            .get(io.opentelemetry.api.common.AttributeKey.stringKey("customer.id"))
+                        != null));
     // Repo observation may be represented via name or attribute
     boolean hasRepo =
         spans.stream()
-            .anyMatch(
-                s ->
-                    s.getName().contains("mtr.customer.repository")
-                        || s.getName().contains("mtrcustomerrepository.findById")
-                        || (s.getAttributes()
-                                .get(
-                                    io.opentelemetry.api.common.AttributeKey.stringKey(
-                                        "customer.id"))
-                            != null));
+            .anyMatch(s ->
+                s.getName().contains("mtr.customer.repository")
+                    || s.getName().contains("mtrcustomerrepository.findById")
+                    || (s.getAttributes()
+                            .get(io.opentelemetry.api.common.AttributeKey.stringKey("customer.id"))
+                        != null));
     assertThat(hasController).as("controller observation span present").isTrue();
     assertThat(hasService).as("service observation span present").isTrue();
     assertThat(hasRepo).as("repository observation span present").isTrue();

@@ -46,8 +46,7 @@ class DualTracingDemoControllerTest {
   @Test
   void testClientSpan() throws Exception {
     mockMvc
-        .perform(
-            get("/api/v1/tracing/otel/client").param("serviceUrl", "https://api.example.com"))
+        .perform(get("/api/v1/tracing/otel/client").param("serviceUrl", "https://api.example.com"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.status").value("SUCCESS"))
         .andExpect(jsonPath("$.operationType").value("OTEL_CLIENT"));
@@ -123,8 +122,7 @@ class DualTracingDemoControllerTest {
         .andExpect(jsonPath("$.status").value("SUCCESS"))
         .andExpect(jsonPath("$.operationType").value("HYBRID"))
         .andExpect(
-            jsonPath("$.businessContext['tracing.framework']")
-                .value("OpenTelemetry + Micrometer"));
+            jsonPath("$.businessContext['tracing.framework']").value("OpenTelemetry + Micrometer"));
   }
 
   // ==================== Comparison Endpoint Test ====================

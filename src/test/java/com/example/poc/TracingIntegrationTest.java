@@ -76,24 +76,21 @@ class TracingIntegrationTest {
 
     boolean foundBusinessAttrs =
         spans.stream()
-            .anyMatch(
-                s ->
-                    s.getAttributes()
-                                .get(
-                                    io.opentelemetry.api.common.AttributeKey.stringKey(
-                                        "business.transaction.id"))
-                            != null
-                        && "integration-user"
-                            .equals(
-                                s.getAttributes()
-                                    .get(
-                                        io.opentelemetry.api.common.AttributeKey.stringKey(
-                                            "user.id")))
-                        && s.getAttributes()
-                                .get(
-                                    io.opentelemetry.api.common.AttributeKey.stringKey(
-                                        "business.product.code"))
-                            != null);
+            .anyMatch(s ->
+                s.getAttributes()
+                            .get(
+                                io.opentelemetry.api.common.AttributeKey.stringKey(
+                                    "business.transaction.id"))
+                        != null
+                    && "integration-user"
+                        .equals(
+                            s.getAttributes()
+                                .get(io.opentelemetry.api.common.AttributeKey.stringKey("user.id")))
+                    && s.getAttributes()
+                            .get(
+                                io.opentelemetry.api.common.AttributeKey.stringKey(
+                                    "business.product.code"))
+                        != null);
 
     assertThat(foundBusinessAttrs).as("at least one span contains business attributes").isTrue();
   }
@@ -163,11 +160,10 @@ class TracingIntegrationTest {
     // At least one span should have error status and fallback attribute
     boolean foundErrorFallback =
         spans.stream()
-            .anyMatch(
-                s ->
-                    s.getStatus().getStatusCode() == io.opentelemetry.api.trace.StatusCode.ERROR
-                        && s.getAttributes().asMap().keySet().stream()
-                            .anyMatch(k -> k.getKey().contains("fallback")));
+            .anyMatch(s ->
+                s.getStatus().getStatusCode() == io.opentelemetry.api.trace.StatusCode.ERROR
+                    && s.getAttributes().asMap().keySet().stream()
+                        .anyMatch(k -> k.getKey().contains("fallback")));
     assertThat(foundErrorFallback)
         .as("at least one span has error status and fallback attribute")
         .isTrue();
@@ -193,20 +189,18 @@ class TracingIntegrationTest {
     // At least one span should have user.id and business.transaction.id baggage attributes
     boolean foundUserId =
         spans.stream()
-            .anyMatch(
-                s ->
-                    userId.equals(
-                        s.getAttributes()
-                            .get(io.opentelemetry.api.common.AttributeKey.stringKey("user.id"))));
+            .anyMatch(s ->
+                userId.equals(
+                    s.getAttributes()
+                        .get(io.opentelemetry.api.common.AttributeKey.stringKey("user.id"))));
     boolean foundTxnId =
         spans.stream()
-            .anyMatch(
-                s ->
-                    s.getAttributes()
-                            .get(
-                                io.opentelemetry.api.common.AttributeKey.stringKey(
-                                    "business.transaction.id"))
-                        != null);
+            .anyMatch(s ->
+                s.getAttributes()
+                        .get(
+                            io.opentelemetry.api.common.AttributeKey.stringKey(
+                                "business.transaction.id"))
+                    != null);
     assertThat(foundUserId).as("at least one span has user.id").isTrue();
     assertThat(foundTxnId).as("at least one span has business.transaction.id").isTrue();
   }

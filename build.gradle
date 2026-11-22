@@ -1,15 +1,18 @@
 plugins {
-    id 'org.springframework.boot' version '3.5.0'
-    id 'io.spring.dependency-management' version '1.1.6'
+    id 'org.springframework.boot' version '3.5.16'
+    id 'io.spring.dependency-management' version '1.1.7'
     id 'java'
-    id 'com.diffplug.spotless' version '6.25.0'
+    id 'com.diffplug.spotless' version '7.2.1'
 }
 
 group = 'com.example'
 version = '1.0.0'
 
+def detectedJavaVersion = Integer.parseInt(System.getProperty("java.specification.version", "21"))
 java {
-    sourceCompatibility = JavaVersion.VERSION_17
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(detectedJavaVersion >= 21 ? detectedJavaVersion : 21)
+    }
 }
 
 repositories {
@@ -17,7 +20,6 @@ repositories {
 }
 
 ext {
-    set('openTelemetryVersion', '1.40.0')
     set('resilience4jVersion', '2.3.0')
 }
 
@@ -28,17 +30,20 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-aop'
     implementation 'org.springframework.boot:spring-boot-starter-security'
 
+    // Tracing dependencies (versions managed by Spring Boot BOM)
     implementation 'io.micrometer:micrometer-tracing-bridge-otel'
     implementation 'io.opentelemetry:opentelemetry-exporter-otlp'
+    implementation 'io.opentelemetry:opentelemetry-sdk'
+
+    // Resilience4j
     implementation "io.github.resilience4j:resilience4j-spring-boot3:${resilience4jVersion}"
     implementation "io.github.resilience4j:resilience4j-micrometer:${resilience4jVersion}"
+
     implementation 'net.logstash.logback:logstash-logback-encoder:8.0'
     implementation 'com.github.ben-manes.caffeine:caffeine'
 
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
-    testImplementation 'org.testcontainers:junit-jupiter'
-    testImplementation 'org.hamcrest:hamcrest:2.2'
-    testImplementation "io.opentelemetry:opentelemetry-sdk-testing:${openTelemetryVersion}"
+    testImplementation 'io.opentelemetry:opentelemetry-sdk-testing'
 
     developmentOnly 'org.springframework.boot:spring-boot-devtools'
     annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
@@ -50,46 +55,29 @@ tasks.named('test') {
 
 // Preserve method parameter names in bytecode so AOP/tracing can access them reliably
 tasks.withType(JavaCompile).configureEach {
+    options.release = 21
     options.compilerArgs += ['-parameters']
 }
 
 /** ---- Spotless configuration ---- */
 spotless {
+    lineEndings 'GIT_ATTRIBUTES_FAST_ALLSAME'
     java {
-        googleJavaFormat()
+        googleJavaFormat('2.0.0')
         toggleOffOn()
         trimTrailingWhitespace()
         endWithNewline()
     }
     format('misc') {
         target '**/*.md', '**/.gitignore'
-        indentWithSpaces(2)
+        leadingTabsToSpaces(2)
         trimTrailingWhitespace()
         endWithNewline()
     }
     format('yaml') {
         target '**/*.yml', '**/*.yaml'
-        indentWithSpaces(2)
+        leadingTabsToSpaces(2)
         trimTrailingWhitespace()
         endWithNewline()
-    }
-}
-
-// Auto-format before build
-tasks.register('spotlessAutoFormat') {
-    group = 'formatting'
-    description = 'Auto-formats Java/Markdown/YAML before build without failing the build.'
-    dependsOn 'spotlessApply'
-}
-
-// Ensure auto-format runs automatically
-tasks.named('build') {
-    dependsOn 'spotlessAutoFormat'
-}
-
-// 🔑 Disable *all* Spotless check tasks so formatting can never block the build
-tasks.withType(com.diffplug.gradle.spotless.SpotlessTask).configureEach {
-    if (name.endsWith("Check")) {
-        enabled = false
     }
 }

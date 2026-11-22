@@ -95,8 +95,7 @@ class Resilience4jDemoControllerTest {
         .perform(get("/api/v1/resilience/bulkhead/semaphore"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.status").value("SUCCESS"))
-        .andExpect(
-            jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Bulkhead")));
+        .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Bulkhead")));
   }
 
   @Test
@@ -151,7 +150,9 @@ class Resilience4jDemoControllerTest {
     String userId = "testUser456";
 
     // Populate cache
-    mockMvc.perform(get("/api/v1/resilience/cache/basic/{userId}", userId)).andExpect(status().isOk());
+    mockMvc
+        .perform(get("/api/v1/resilience/cache/basic/{userId}", userId))
+        .andExpect(status().isOk());
 
     // Evict cache
     mockMvc
