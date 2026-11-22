@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <!-- Console JSON logging with trace context (traceId, spanId) from MDC -->
+    <appender name="JSON_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+            <providers>
+                <timestamp>
+                    <timeZone>UTC</timeZone>
+                    <fieldName>@timestamp</fieldName>
+                </timestamp>
+                <pattern>
+                    <pattern>
+                        {
+                          "level":"%level",
+                          "logger":"%logger{36}",
+                          "thread":"%thread",
+                          "message":"%msg"
+                        }
+                    </pattern>
+                </pattern>
+                <mdc>
+                    <!-- Include trace context and business IDs set in MDC by the aspect -->
+                    <includeMdcKeyName>traceId</includeMdcKeyName>
+                    <includeMdcKeyName>spanId</includeMdcKeyName>
+                    <includeMdcKeyName>businessTransactionId</includeMdcKeyName>
+                    <includeMdcKeyName>correlationId</includeMdcKeyName>
+                    <includeMdcKeyName>userId</includeMdcKeyName>
+                    <includeMdcKeyName>actionType</includeMdcKeyName>
+                </mdc>
+                <stackTrace>
+                    <fieldName>exception</fieldName>
+                </stackTrace>
+            </providers>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="JSON_CONSOLE"/>
+    </root>
+
+    <!-- Package-specific levels; app logs at DEBUG in dev profile per application.yml -->
+    <logger name="com.example.poc" level="DEBUG"/>
+    <logger name="io.github.resilience4j" level="INFO"/>
+    <logger name="io.opentelemetry" level="INFO"/>
+
+</configuration>

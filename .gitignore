@@ -1,0 +1,9 @@
+.gradle/
+build/
+logs/
+.DS_Store
+.idea/
+*.iml
+.vscode/tasks.json.bak
+out/
+bin/

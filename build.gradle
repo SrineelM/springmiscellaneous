@@ -1,0 +1,95 @@
+plugins {
+    id 'org.springframework.boot' version '3.5.0'
+    id 'io.spring.dependency-management' version '1.1.6'
+    id 'java'
+    id 'com.diffplug.spotless' version '6.25.0'
+}
+
+group = 'com.example'
+version = '1.0.0'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+}
+
+repositories {
+    mavenCentral()
+}
+
+ext {
+    set('openTelemetryVersion', '1.40.0')
+    set('resilience4jVersion', '2.3.0')
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'org.springframework.boot:spring-boot-starter-cache'
+    implementation 'org.springframework.boot:spring-boot-starter-aop'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+
+    implementation 'io.micrometer:micrometer-tracing-bridge-otel'
+    implementation 'io.opentelemetry:opentelemetry-exporter-otlp'
+    implementation "io.github.resilience4j:resilience4j-spring-boot3:${resilience4jVersion}"
+    implementation "io.github.resilience4j:resilience4j-micrometer:${resilience4jVersion}"
+    implementation 'net.logstash.logback:logstash-logback-encoder:8.0'
+    implementation 'com.github.ben-manes.caffeine:caffeine'
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.testcontainers:junit-jupiter'
+    testImplementation 'org.hamcrest:hamcrest:2.2'
+    testImplementation "io.opentelemetry:opentelemetry-sdk-testing:${openTelemetryVersion}"
+
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+    annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+// Preserve method parameter names in bytecode so AOP/tracing can access them reliably
+tasks.withType(JavaCompile).configureEach {
+    options.compilerArgs += ['-parameters']
+}
+
+/** ---- Spotless configuration ---- */
+spotless {
+    java {
+        googleJavaFormat()
+        toggleOffOn()
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+    format('misc') {
+        target '**/*.md', '**/.gitignore'
+        indentWithSpaces(2)
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+    format('yaml') {
+        target '**/*.yml', '**/*.yaml'
+        indentWithSpaces(2)
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+}
+
+// Auto-format before build
+tasks.register('spotlessAutoFormat') {
+    group = 'formatting'
+    description = 'Auto-formats Java/Markdown/YAML before build without failing the build.'
+    dependsOn 'spotlessApply'
+}
+
+// Ensure auto-format runs automatically
+tasks.named('build') {
+    dependsOn 'spotlessAutoFormat'
+}
+
+// 🔑 Disable *all* Spotless check tasks so formatting can never block the build
+tasks.withType(com.diffplug.gradle.spotless.SpotlessTask).configureEach {
+    if (name.endsWith("Check")) {
+        enabled = false
+    }
+}
