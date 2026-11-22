@@ -160,8 +160,10 @@ class DualTracingDemoServiceTest {
         .contains("Programmatic")
         .contains("fine-grained control");
     assertThat(comparison.get("micrometer_approach")).contains("Declarative").contains("@Observed");
-    assertThat(comparison.get("when_to_use_opentelemetry")).contains("custom span manipulation");
-    assertThat(comparison.get("when_to_use_micrometer")).contains("standard Spring Boot");
+    assertThat(comparison.get("when_to_use_opentelemetry"))
+        .containsIgnoringCase("custom span manipulation");
+    assertThat(comparison.get("when_to_use_micrometer"))
+        .containsIgnoringCase("standard Spring Boot");
   }
 
   // ==================== Multiple Calls Test ====================

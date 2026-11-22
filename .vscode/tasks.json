@@ -1,0 +1,65 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Gradle: Full Build",
+      "type": "shell",
+      "command": "./gradlew build",
+      "windows": {
+        "command": ".\\gradlew.bat build"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": ["$gradle"]
+    },
+    {
+      "label": "Gradle: Test All",
+      "type": "shell",
+      "command": "./gradlew test",
+      "windows": {
+        "command": ".\\gradlew.bat test"
+      },
+      "group": "test",
+      "problemMatcher": ["$gradle"]
+    },
+    {
+      "label": "Gradle: Run Tracing and Resilience Tests",
+      "type": "shell",
+      "command": "./gradlew test --tests com.example.poc.TracingIntegrationTest --tests com.example.poc.service.Resilience4jPatternTransitionsTest",
+      "windows": {
+        "command": ".\\gradlew.bat test --tests com.example.poc.TracingIntegrationTest --tests com.example.poc.service.Resilience4jPatternTransitionsTest"
+      },
+      "group": "test",
+      "problemMatcher": ["$gradle"]
+    },
+    {
+      "label": "Gradle: BootRun",
+      "type": "shell",
+      "command": "./gradlew bootRun",
+      "windows": {
+        "command": ".\\gradlew.bat bootRun"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Spotless: Check",
+      "type": "shell",
+      "command": "./gradlew spotlessCheck",
+      "windows": {
+        "command": ".\\gradlew.bat spotlessCheck"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Spotless: Apply",
+      "type": "shell",
+      "command": "./gradlew spotlessApply",
+      "windows": {
+        "command": ".\\gradlew.bat spotlessApply"
+      },
+      "problemMatcher": []
+    }
+  ]
+}

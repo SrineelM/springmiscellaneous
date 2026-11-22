@@ -183,7 +183,14 @@ public class DistributedTracingAspect {
 
           addReturnValueInfo(span, result, methodName, joinPoint);
 
-          span.setStatus(StatusCode.OK);
+          if (methodName.toLowerCase().contains("fallback")
+              || (result instanceof ProcessingResult pr && "FALLBACK".equalsIgnoreCase(pr.getStatus()))) {
+            span.setAttribute("fallback", true);
+            span.setAttribute("fallback.triggered", true);
+            span.setStatus(StatusCode.ERROR, "Fallback execution");
+          } else {
+            span.setStatus(StatusCode.OK);
+          }
           logger.info(
               "Successfully completed {}.{} in {}ms - TxnId: {}",
               className,

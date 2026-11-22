@@ -102,7 +102,7 @@ public class Resilience4jDemoService {
       throw new RuntimeException("Attempt " + currentAttempt + " failed (will retry)");
     }
 
-    return "Success after " + currentAttempt + " attempts";
+    return "Retry success after " + currentAttempt + " attempts";
   }
 
   private String retryFallback(int attemptToFail, Throwable t) {
@@ -140,7 +140,7 @@ public class Resilience4jDemoService {
   @RateLimiter(name = "basicRateLimiter", fallbackMethod = "rateLimiterFallback")
   public String basicRateLimiterDemo(String requestId) {
     logger.info("Processing request: {}", requestId);
-    return "Request " + requestId + " processed successfully";
+    return "Rate Limiter: Request " + requestId + " processed successfully";
   }
 
   private String rateLimiterFallback(String requestId, Throwable t) {
